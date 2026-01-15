@@ -1,0 +1,43 @@
+#!/bin/bash
+# cc-ls - List all running Claude Code agents
+
+echo "=== Claude Code Agents ==="
+echo ""
+
+# Get tmux sessions
+sessions=$(tmux ls 2>/dev/null)
+
+if [ -z "$sessions" ]; then
+    echo "No agents running."
+    echo ""
+    echo "Start a new agent with: cc-new <name> <directory>"
+    exit 0
+fi
+
+echo "Running agents:"
+echo ""
+printf "%-20s %-40s %s\n" "NAME" "DIRECTORY" "STATUS"
+printf "%-20s %-40s %s\n" "----" "---------" "------"
+
+while IFS= read -r line; do
+    # Parse tmux session info
+    session_name=$(echo "$line" | cut -d: -f1)
+
+    # Get working directory from tmux
+    working_dir=$(tmux display-message -t "$session_name" -p '#{pane_current_path}' 2>/dev/null || echo "unknown")
+
+    # Check if Claude is running in the session
+    if tmux list-panes -t "$session_name" -F '#{pane_current_command}' 2>/dev/null | grep -q "claude\|node"; then
+        status="active"
+    else
+        status="idle"
+    fi
+
+    printf "%-20s %-40s %s\n" "$session_name" "$working_dir" "$status"
+done <<< "$sessions"
+
+echo ""
+echo "Commands:"
+echo "  cc-attach <name>  - Attach to agent"
+echo "  cc-stop <name>    - Stop agent"
+echo "  cc-new <name> <dir> - Start new agent"

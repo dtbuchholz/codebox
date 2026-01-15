@@ -1,0 +1,84 @@
+#!/bin/bash
+# cc-stop - Stop a Claude Code agent
+
+set -e
+
+usage() {
+    echo "Usage: cc-stop <agent-name> [--force]"
+    echo ""
+    echo "Stop a Claude Code agent and its tmux session."
+    echo ""
+    echo "Options:"
+    echo "  --force    Kill immediately without graceful shutdown"
+    echo "  --all      Stop all agents"
+    echo ""
+    echo "Use 'cc-ls' to see available agents."
+    exit 1
+}
+
+if [ -z "$1" ]; then
+    usage
+fi
+
+AGENT_NAME="$1"
+FORCE=""
+
+# Handle --all flag
+if [ "$AGENT_NAME" = "--all" ]; then
+    echo "Stopping all agents..."
+    sessions=$(tmux ls -F "#{session_name}" 2>/dev/null || true)
+    if [ -z "$sessions" ]; then
+        echo "No agents running."
+        exit 0
+    fi
+    for session in $sessions; do
+        echo "  Stopping $session..."
+        tmux kill-session -t "$session" 2>/dev/null || true
+    done
+    echo "All agents stopped."
+    exit 0
+fi
+
+# Handle --force flag
+if [ "$2" = "--force" ]; then
+    FORCE="1"
+fi
+
+# Check if session exists
+if ! tmux has-session -t "$AGENT_NAME" 2>/dev/null; then
+    echo "Error: Agent '$AGENT_NAME' not found."
+    echo ""
+    echo "Available agents:"
+    tmux ls 2>/dev/null || echo "  (no agents running)"
+    exit 1
+fi
+
+if [ -n "$FORCE" ]; then
+    echo "Force stopping agent '$AGENT_NAME'..."
+    tmux kill-session -t "$AGENT_NAME"
+else
+    echo "Stopping agent '$AGENT_NAME'..."
+
+    # Try graceful shutdown first - send Ctrl-C to interrupt Claude
+    tmux send-keys -t "$AGENT_NAME" C-c
+    sleep 1
+
+    # Send exit command
+    tmux send-keys -t "$AGENT_NAME" "exit" Enter
+    sleep 1
+
+    # If session still exists, kill it
+    if tmux has-session -t "$AGENT_NAME" 2>/dev/null; then
+        tmux kill-session -t "$AGENT_NAME"
+    fi
+fi
+
+echo "Agent '$AGENT_NAME' stopped."
+
+# Show remaining agents
+remaining=$(tmux ls 2>/dev/null || true)
+if [ -n "$remaining" ]; then
+    echo ""
+    echo "Remaining agents:"
+    echo "$remaining"
+fi

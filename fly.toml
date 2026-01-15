@@ -1,0 +1,48 @@
+# Fly.io configuration for Agent Box
+# See https://fly.io/docs/reference/configuration/
+
+app = "agent-box"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# No public HTTP services - access via Tailscale only
+# Uncomment below if you want public SSH access (not recommended)
+# [[services]]
+#   internal_port = 2222
+#   protocol = "tcp"
+#   [[services.ports]]
+#     port = 2222
+
+[env]
+  # App name for Tailscale hostname
+  FLY_APP_NAME = "agent-box"
+  # Default ntfy topic (override with secrets)
+  NTFY_TOPIC = "agent-box-notifications"
+
+# Mount persistent volume
+[mounts]
+  source = "agent_data"
+  destination = "/data"
+  initial_size = "10gb"
+
+# Machine configuration
+[vm]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  cpus = 2
+
+# Process configuration
+[processes]
+  app = ""
+
+# Restart policy
+[restart]
+  policy = "always"
+  max_retries = 10
+
+# Metrics (optional)
+[metrics]
+  port = 9091
+  path = "/metrics"

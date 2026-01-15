@@ -1,0 +1,84 @@
+#!/bin/bash
+# cc-new - Create a new Claude Code agent in a tmux session
+
+set -e
+
+usage() {
+    echo "Usage: cc-new <agent-name> [directory]"
+    echo ""
+    echo "Create a new Claude Code agent in a tmux session."
+    echo ""
+    echo "Arguments:"
+    echo "  agent-name   Name for the tmux session (required)"
+    echo "  directory    Working directory (default: /data/repos)"
+    echo ""
+    echo "Examples:"
+    echo "  cc-new myproject /data/repos/myproject"
+    echo "  cc-new feature-auth /data/worktrees/myrepo/auth-branch"
+    exit 1
+}
+
+if [ -z "$1" ]; then
+    usage
+fi
+
+AGENT_NAME="$1"
+WORK_DIR="${2:-/data/repos}"
+
+# Validate agent name (alphanumeric, dash, underscore only)
+if ! [[ "$AGENT_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "Error: Agent name must be alphanumeric (with - or _ allowed)"
+    exit 1
+fi
+
+# Check if session already exists
+if tmux has-session -t "$AGENT_NAME" 2>/dev/null; then
+    echo "Error: Agent '$AGENT_NAME' already exists."
+    echo "Use 'cc-attach $AGENT_NAME' to connect, or 'cc-stop $AGENT_NAME' to stop it."
+    exit 1
+fi
+
+# Create working directory if it doesn't exist
+mkdir -p "$WORK_DIR"
+
+# Create log directory for this agent
+LOG_DIR="/data/logs/$AGENT_NAME"
+mkdir -p "$LOG_DIR"
+
+# Create inbox file for this agent (for reply-from-phone)
+INBOX_FILE="/data/inbox/$AGENT_NAME.txt"
+touch "$INBOX_FILE"
+
+echo "Creating agent '$AGENT_NAME'..."
+echo "  Working directory: $WORK_DIR"
+echo "  Log directory: $LOG_DIR"
+echo "  Inbox file: $INBOX_FILE"
+
+# Create tmux session with Claude Code
+# Using -d to create detached, then we'll attach
+tmux new-session -d -s "$AGENT_NAME" -c "$WORK_DIR"
+
+# Set up the environment in the session
+tmux send-keys -t "$AGENT_NAME" "export AGENT_NAME='$AGENT_NAME'" Enter
+tmux send-keys -t "$AGENT_NAME" "export AGENT_LOG_DIR='$LOG_DIR'" Enter
+tmux send-keys -t "$AGENT_NAME" "export AGENT_INBOX='$INBOX_FILE'" Enter
+
+# Add a small pane at the bottom for inbox monitoring (optional split)
+# tmux split-window -t "$AGENT_NAME" -v -l 5 "tail -f $INBOX_FILE"
+# tmux select-pane -t "$AGENT_NAME:0.0"
+
+# Start Claude Code
+tmux send-keys -t "$AGENT_NAME" "clear && echo '=== Agent: $AGENT_NAME ===' && echo 'Directory: $WORK_DIR' && echo '' && claude" Enter
+
+echo ""
+echo "Agent '$AGENT_NAME' created!"
+echo ""
+echo "To attach: cc-attach $AGENT_NAME"
+echo "To stop:   cc-stop $AGENT_NAME"
+
+# Optionally auto-attach
+if [ "$AUTO_ATTACH" = "1" ] || [ "$3" = "--attach" ]; then
+    echo ""
+    echo "Attaching..."
+    tmux attach-session -t "$AGENT_NAME"
+fi

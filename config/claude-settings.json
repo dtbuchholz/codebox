@@ -1,0 +1,33 @@
+{
+  "$schema": "https://claude.ai/schemas/claude-code-settings.json",
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/hooks/notification-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [],
+    "PostToolUse": [],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/hooks/prompt-hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [],
+    "deny": []
+  }
+}

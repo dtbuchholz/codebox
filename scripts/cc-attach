@@ -1,0 +1,42 @@
+#!/bin/bash
+# cc-attach - Attach to an existing Claude Code agent
+
+set -e
+
+usage() {
+    echo "Usage: cc-attach <agent-name>"
+    echo ""
+    echo "Attach to an existing Claude Code agent session."
+    echo ""
+    echo "Use 'cc-ls' to see available agents."
+    exit 1
+}
+
+if [ -z "$1" ]; then
+    # If no argument, show list and prompt
+    echo "Available agents:"
+    echo ""
+    tmux ls 2>/dev/null || echo "  (no agents running)"
+    echo ""
+    usage
+fi
+
+AGENT_NAME="$1"
+
+# Check if session exists
+if ! tmux has-session -t "$AGENT_NAME" 2>/dev/null; then
+    echo "Error: Agent '$AGENT_NAME' not found."
+    echo ""
+    echo "Available agents:"
+    tmux ls 2>/dev/null || echo "  (no agents running)"
+    echo ""
+    echo "Create a new agent with: cc-new $AGENT_NAME <directory>"
+    exit 1
+fi
+
+# Attach to the session
+echo "Attaching to agent '$AGENT_NAME'..."
+echo "Detach with: Ctrl-b d"
+echo ""
+
+tmux attach-session -t "$AGENT_NAME"
