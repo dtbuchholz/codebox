@@ -5,6 +5,11 @@
 webhook/webhook-receiver
 webhook/.golangci-lint-cache/
 
+# Node.js (for Prettier)
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+
 # Pre-commit
 .pre-commit-cache/
 

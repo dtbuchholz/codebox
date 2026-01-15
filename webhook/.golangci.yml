@@ -16,18 +16,18 @@ linters:
     - unused
 
     # Additional linters
-    - bodyclose      # Check HTTP response body is closed
-    - dupl           # Code duplication
-    - gofmt          # Formatting
-    - goimports      # Import ordering
-    - goconst        # Repeated strings that could be constants
-    - gocritic       # Opinionated linter
-    - gosec          # Security issues
-    - misspell       # Spelling mistakes
-    - nilerr         # nil error returns
-    - prealloc       # Slice preallocation
-    - unconvert      # Unnecessary type conversions
-    - unparam        # Unused parameters
+    - bodyclose # Check HTTP response body is closed
+    - dupl # Code duplication
+    - gofmt # Formatting
+    - goimports # Import ordering
+    - goconst # Repeated strings that could be constants
+    - gocritic # Opinionated linter
+    - gosec # Security issues
+    - misspell # Spelling mistakes
+    - nilerr # nil error returns
+    - prealloc # Slice preallocation
+    - unconvert # Unnecessary type conversions
+    - unparam # Unused parameters
 
 linters-settings:
   errcheck:
@@ -49,7 +49,7 @@ linters-settings:
 
   gosec:
     excludes:
-      - G104  # Audit errors not checked (we handle this case-by-case)
+      - G104 # Audit errors not checked (we handle this case-by-case)
 
   dupl:
     threshold: 100

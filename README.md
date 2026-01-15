@@ -107,14 +107,14 @@ cc-stop myproject
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TAILSCALE_AUTHKEY` | Tailscale auth key | Required |
-| `AUTHORIZED_KEYS` | SSH public keys | Required |
-| `NTFY_TOPIC` | ntfy topic name | `agent-box` |
-| `NTFY_SERVER` | ntfy server URL | `https://ntfy.sh` |
-| `WEBHOOK_AUTH_TOKEN` | Auth token for webhook | None |
-| `ENABLE_WEBHOOK` | Enable webhook receiver | `1` |
+| Variable             | Description             | Default           |
+| -------------------- | ----------------------- | ----------------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key      | Required          |
+| `AUTHORIZED_KEYS`    | SSH public keys         | Required          |
+| `NTFY_TOPIC`         | ntfy topic name         | `agent-box`       |
+| `NTFY_SERVER`        | ntfy server URL         | `https://ntfy.sh` |
+| `WEBHOOK_AUTH_TOKEN` | Auth token for webhook  | None              |
+| `ENABLE_WEBHOOK`     | Enable webhook receiver | `1`               |
 
 ### Notifications
 
@@ -147,6 +147,7 @@ curl -X POST "http://<tailscale-ip>:8080/send" \
 ```
 
 With auth token:
+
 ```bash
 curl -X POST "http://<tailscale-ip>:8080/inbox?token=your-secret" \
   -d "agent=myproject" \
@@ -155,14 +156,14 @@ curl -X POST "http://<tailscale-ip>:8080/inbox?token=your-secret" \
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `cc-ls` | List all running agents |
+| Command               | Description                     |
+| --------------------- | ------------------------------- |
+| `cc-ls`               | List all running agents         |
 | `cc-new <name> <dir>` | Create a new agent in directory |
-| `cc-attach <name>` | Attach to an existing agent |
-| `cc-stop <name>` | Stop an agent |
-| `cc-stop --all` | Stop all agents |
-| `notify.sh <msg>` | Send a test notification |
+| `cc-attach <name>`    | Attach to an existing agent     |
+| `cc-stop <name>`      | Stop an agent                   |
+| `cc-stop --all`       | Stop all agents                 |
+| `notify.sh <msg>`     | Send a test notification        |
 
 ## Directory Structure
 
@@ -216,16 +217,19 @@ fly machines destroy <machine-id>
 ## Troubleshooting
 
 ### Can't connect via SSH
+
 - Check Tailscale is connected: `tailscale status`
 - Verify SSH key is set: `fly secrets list`
 - Check logs: `fly logs`
 
 ### Agent not starting
+
 - Check tmux: `tmux ls`
 - Check Claude Code: `which claude`
 - View logs: `cat /data/logs/<agent>/`
 
 ### Notifications not working
+
 - Test manually: `notify.sh -a test "Hello"`
 - Check ntfy subscription
 - Verify topic: `echo $NTFY_TOPIC`

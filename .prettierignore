@@ -1,0 +1,30 @@
+# Build outputs
+*.local
+data/
+
+# Go files (handled by gofmt)
+*.go
+
+# Shell scripts (no prettier support)
+scripts/
+hooks/
+config/*.sh
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+.zed/
+
+# OS
+.DS_Store
+
+# Env files
+.env*
+!.env.example
+
+# Generated
+.fly/

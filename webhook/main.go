@@ -31,10 +31,10 @@ type Response struct {
 }
 
 var (
-	inboxDir     = getEnv("INBOX_DIR", "/data/inbox")
-	listenAddr   = getEnv("WEBHOOK_ADDR", ":8080")
-	authToken    = os.Getenv("WEBHOOK_AUTH_TOKEN") // Optional auth
-	agentNameRe  = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	inboxDir    = getEnv("INBOX_DIR", "/data/inbox")
+	listenAddr  = getEnv("WEBHOOK_ADDR", ":8080")
+	authToken   = os.Getenv("WEBHOOK_AUTH_TOKEN") // Optional auth
+	agentNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
 func getEnv(key, fallback string) string {
