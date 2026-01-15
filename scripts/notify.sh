@@ -7,6 +7,7 @@
 # Load config if exists
 CONFIG_FILE="/data/config/notify.conf"
 if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
 

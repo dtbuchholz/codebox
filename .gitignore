@@ -3,6 +3,10 @@
 
 # Go
 webhook/webhook-receiver
+webhook/.golangci-lint-cache/
+
+# Pre-commit
+.pre-commit-cache/
 
 # Secrets
 *.pem
@@ -22,3 +26,10 @@ Thumbs.db
 *~
 .idea/
 .vscode/
+.zed/
+
+# Local dev
+data/
+
+# Claude
+.claude/

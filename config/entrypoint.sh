@@ -49,9 +49,11 @@ Commands:
 EOF
 
 # Append current agent status to MOTD
-echo "Current agents:" >> /etc/motd
-su - agent -c "tmux ls 2>/dev/null || echo '  (none running)'" >> /etc/motd
-echo "" >> /etc/motd
+{
+    echo "Current agents:"
+    su - agent -c "tmux ls 2>/dev/null || echo '  (none running)'"
+    echo ""
+} >> /etc/motd
 
 # Start Tailscale daemon
 echo "Starting Tailscale..."
@@ -113,4 +115,5 @@ echo "Webhook: port 8080"
 echo "Tailscale: $(tailscale ip -4 2>/dev/null || echo 'pending auth')"
 
 # Keep container running (wait for any child process)
+# shellcheck disable=SC2086
 wait -n $SSHD_PID ${WEBHOOK_PID:-}

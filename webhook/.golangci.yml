@@ -1,0 +1,74 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - bodyclose      # Check HTTP response body is closed
+    - dupl           # Code duplication
+    - gofmt          # Formatting
+    - goimports      # Import ordering
+    - goconst        # Repeated strings that could be constants
+    - gocritic       # Opinionated linter
+    - gosec          # Security issues
+    - misspell       # Spelling mistakes
+    - nilerr         # nil error returns
+    - prealloc       # Slice preallocation
+    - unconvert      # Unnecessary type conversions
+    - unparam        # Unused parameters
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked (we handle this case-by-case)
+
+  dupl:
+    threshold: 100
+
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    # Allow fmt.Print in main package (for CLI output)
+    - path: main\.go
+      linters:
+        - forbidigo
+
+    # Test files can have longer functions
+    - path: _test\.go
+      linters:
+        - dupl
+        - goconst
+
+  max-issues-per-linter: 50
+  max-same-issues: 10
