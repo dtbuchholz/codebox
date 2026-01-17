@@ -116,6 +116,13 @@ uv python install 3.13
 uv tool install -U takopi
 ```
 
+If you want voice note transcription, set your OpenAI API key:
+
+```bash
+echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ### 3. Start using agents
 
 **Via SSH:**
@@ -152,19 +159,37 @@ Just message your bot! Takopi routes messages to Claude Code.
 Takopi provides secure, authenticated Telegram integration:
 
 - **End-to-end encrypted** (Telegram's encryption)
-- **Voice note transcription** (reply by voice)
+- **Voice note transcription** (reply by voice, requires OPENAI_API_KEY)
 - **File transfers** (send/receive files)
 - **Session persistence** (resume conversations)
 - **Forum topics** (one topic per agent)
 
-```bash
-# Run setup wizard
-takopi
+**Setup steps:**
 
-# Or configure manually
-cp /opt/config/takopi.toml.example ~/.takopi/takopi.toml
-# Edit with your bot token and chat ID
-```
+1. **Create a Telegram bot**: Message [@BotFather](https://t.me/BotFather) on Telegram
+   - Send `/newbot` and follow prompts
+   - Save the bot token (looks like `123456789:ABCdefGHI...`)
+
+2. **Run the Takopi wizard** (recommended for first-time setup):
+
+   ```bash
+   takopi
+   ```
+
+   The wizard will guide you through configuration.
+
+3. **Or configure manually**:
+
+   ```bash
+   mkdir -p ~/.takopi
+   cp /opt/config/takopi.toml.example ~/.takopi/takopi.toml
+   vi ~/.takopi/takopi.toml
+   # Add your bot_token from step 1
+   ```
+
+4. **Get your chat ID**: Send any message to your bot. It will reply with your chat ID. Add this to your config.
+
+5. **Run Takopi**: `takopi` (it will connect to Telegram and start listening)
 
 ### Option 2: SSH + tmux
 
@@ -211,11 +236,12 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 ### Environment Variables
 
-| Variable            | Description        | Default  |
-| ------------------- | ------------------ | -------- |
-| `TAILSCALE_AUTHKEY` | Tailscale auth key | Required |
-| `AUTHORIZED_KEYS`   | SSH public keys    | Required |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token | Optional |
+| Variable             | Description             | Default  |
+| -------------------- | ----------------------- | -------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key      | Required |
+| `AUTHORIZED_KEYS`    | SSH public keys         | Required |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token      | Optional |
+| `OPENAI_API_KEY`     | For voice transcription | Optional |
 
 ### Takopi Config (`~/.takopi/takopi.toml`)
 
@@ -303,9 +329,15 @@ path = "/data/repos/myproject"
 
 ### Telegram not working
 
-- Verify bot token: message @BotFather
+- Verify bot token: message @BotFather, use `/mybots` to check
 - Check Takopi config: `cat ~/.takopi/takopi.toml`
+- Ensure chat_id is set (bot tells you on first message)
 - View Takopi logs: `takopi --verbose`
+
+### Voice transcription not working
+
+- Ensure OPENAI_API_KEY is set: `echo $OPENAI_API_KEY`
+- Check it's exported in your shell config (~/.bashrc)
 
 ### Agent not starting
 
