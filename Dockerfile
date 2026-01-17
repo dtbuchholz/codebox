@@ -75,7 +75,10 @@ RUN chmod +x /opt/hooks/*.sh 2>/dev/null || true
 # Copy config files
 COPY config/entrypoint.sh /entrypoint.sh
 COPY config/claude-settings.json /opt/claude-settings.json
+RUN mkdir -p /opt/config
 COPY config/notify.conf.example /opt/notify.conf.example
+COPY config/agentbox.toml.example /opt/config/agentbox.toml.example
+COPY config/takopi.toml.example /opt/config/takopi.toml.example
 RUN chmod +x /entrypoint.sh
 
 # Expose ports (internal - Tailscale handles external access)

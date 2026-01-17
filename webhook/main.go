@@ -5,7 +5,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -37,6 +39,11 @@ var (
 	agentNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
+const (
+	maxBodyBytes = int64(1 << 20) // 1MB
+	tmuxTimeout  = 2 * time.Second
+)
+
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -56,7 +63,19 @@ func main() {
 		log.Println("Auth token configured")
 	}
 
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+	if err := os.MkdirAll(inboxDir, 0755); err != nil {
+		log.Fatalf("failed to create inbox dir: %v", err)
+	}
+
+	server := &http.Server{
+		Addr:              listenAddr,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -100,70 +119,11 @@ func inboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var msg InboxMessage
-
-	// Support both JSON and form data
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/json") {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			respondError(w, "failed to read body", http.StatusBadRequest)
-			return
-		}
-		if err := json.Unmarshal(body, &msg); err != nil {
-			respondError(w, "invalid JSON", http.StatusBadRequest)
-			return
-		}
-	} else {
-		// Form data
-		msg.Agent = r.FormValue("agent")
-		msg.Message = r.FormValue("message")
-		msg.Inject = r.FormValue("inject") == "true" || r.FormValue("inject") == "1"
-	}
-
-	// Validate
-	if msg.Agent == "" {
-		respondError(w, "agent name required", http.StatusBadRequest)
-		return
-	}
-	if !agentNameRe.MatchString(msg.Agent) {
-		respondError(w, "invalid agent name", http.StatusBadRequest)
-		return
-	}
-	if msg.Message == "" {
-		respondError(w, "message required", http.StatusBadRequest)
-		return
-	}
-
-	// Write to inbox file
-	inboxFile := filepath.Join(inboxDir, msg.Agent+".txt")
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	entry := fmt.Sprintf("[%s] %s\n", timestamp, msg.Message)
-
-	f, err := os.OpenFile(inboxFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	msg, err := parseInboxMessage(w, r, false)
 	if err != nil {
-		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
 		return
 	}
-	defer f.Close()
-
-	if _, err := f.WriteString(entry); err != nil {
-		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("Inbox message for %s: %s", msg.Agent, truncate(msg.Message, 50))
-
-	// Optionally inject into tmux
-	if msg.Inject {
-		if err := injectToTmux(msg.Agent, msg.Message); err != nil {
-			// Don't fail the request, just log
-			log.Printf("Warning: failed to inject to tmux: %v", err)
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{Success: true, Message: "message delivered"})
+	deliverMessage(w, msg, "message delivered")
 }
 
 func sendHandler(w http.ResponseWriter, r *http.Request) {
@@ -179,49 +139,26 @@ func sendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	agent := r.FormValue("agent")
-	message := r.FormValue("message")
-
-	if agent == "" || message == "" {
-		respondError(w, "agent and message required", http.StatusBadRequest)
-		return
-	}
-
-	if !agentNameRe.MatchString(agent) {
-		respondError(w, "invalid agent name", http.StatusBadRequest)
-		return
-	}
-
-	// Write to inbox
-	inboxFile := filepath.Join(inboxDir, agent+".txt")
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	entry := fmt.Sprintf("[%s] %s\n", timestamp, message)
-
-	f, err := os.OpenFile(inboxFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	msg, err := parseInboxMessage(w, r, true)
 	if err != nil {
-		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
 		return
 	}
-	f.WriteString(entry)
-	f.Close()
-
-	// Inject to tmux
-	if err := injectToTmux(agent, message); err != nil {
-		log.Printf("Warning: failed to inject to tmux: %v", err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{Success: true, Message: "message sent"})
+	deliverMessage(w, msg, "message sent")
 }
 
 func agentsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(Response{Success: false, Error: "method not allowed"})
+		return
+	}
 	if !checkAuth(w, r) {
 		return
 	}
 
 	// List tmux sessions
-	cmd := exec.Command("tmux", "ls", "-F", "#{session_name}")
-	output, err := cmd.Output()
+	output, err := tmuxOutput("ls", "-F", "#{session_name}")
 	if err != nil {
 		// No sessions
 		w.Header().Set("Content-Type", "application/json")
@@ -246,15 +183,13 @@ func agentsHandler(w http.ResponseWriter, r *http.Request) {
 
 func injectToTmux(session, message string) error {
 	// Check if session exists
-	checkCmd := exec.Command("tmux", "has-session", "-t", session)
-	if err := checkCmd.Run(); err != nil {
+	if err := tmuxRun("has-session", "-t", session); err != nil {
 		return fmt.Errorf("session not found: %s", session)
 	}
 
 	// Send keys to tmux
 	// This types the message into the active pane
-	cmd := exec.Command("tmux", "send-keys", "-t", session, message, "Enter")
-	return cmd.Run()
+	return tmuxRun("send-keys", "-t", session, message, "Enter")
 }
 
 func respondError(w http.ResponseWriter, msg string, code int) {
@@ -268,4 +203,110 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+func parseInboxMessage(w http.ResponseWriter, r *http.Request, injectDefault bool) (InboxMessage, error) {
+	var msg InboxMessage
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	defer r.Body.Close()
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&msg); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				respondError(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return InboxMessage{}, err
+			}
+			respondError(w, "invalid JSON", http.StatusBadRequest)
+			return InboxMessage{}, err
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			respondError(w, "invalid form data", http.StatusBadRequest)
+			return InboxMessage{}, err
+		}
+		msg.Agent = r.FormValue("agent")
+		msg.Message = r.FormValue("message")
+		msg.Inject = r.FormValue("inject") == "true" || r.FormValue("inject") == "1"
+	}
+
+	if injectDefault {
+		msg.Inject = msg.Inject || injectDefault
+	}
+
+	if msg.Agent == "" {
+		respondError(w, "agent name required", http.StatusBadRequest)
+		return InboxMessage{}, fmt.Errorf("missing agent name")
+	}
+	if !agentNameRe.MatchString(msg.Agent) {
+		respondError(w, "invalid agent name", http.StatusBadRequest)
+		return InboxMessage{}, fmt.Errorf("invalid agent name")
+	}
+	if msg.Message == "" {
+		respondError(w, "message required", http.StatusBadRequest)
+		return InboxMessage{}, fmt.Errorf("missing message")
+	}
+
+	return msg, nil
+}
+
+func deliverMessage(w http.ResponseWriter, msg InboxMessage, okMessage string) {
+	inboxFile := filepath.Join(inboxDir, msg.Agent+".txt")
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	entry := fmt.Sprintf("[%s] %s\n", timestamp, msg.Message)
+
+	if err := os.MkdirAll(inboxDir, 0755); err != nil {
+		respondError(w, "failed to create inbox directory", http.StatusInternalServerError)
+		return
+	}
+
+	f, err := os.OpenFile(inboxFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(entry); err != nil {
+		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Inbox message for %s: %s", msg.Agent, truncate(msg.Message, 50))
+
+	if msg.Inject {
+		if err := injectToTmux(msg.Agent, msg.Message); err != nil {
+			log.Printf("Warning: failed to inject to tmux: %v", err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(Response{Success: true, Message: okMessage})
+}
+
+func tmuxOutput(args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), tmuxTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "tmux", args...)
+	output, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("tmux command timed out")
+	}
+	return output, err
+}
+
+func tmuxRun(args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), tmuxTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "tmux", args...)
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("tmux command timed out")
+		}
+		return err
+	}
+	return nil
 }

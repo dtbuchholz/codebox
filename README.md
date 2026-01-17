@@ -48,14 +48,15 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 
 ## Quick Start
 
-### 1. Prerequisites
+### 1. Local machine setup
 
-- [Fly.io account](https://fly.io) with `flyctl` installed
-- [Tailscale account](https://tailscale.com)
-- SSH key pair
-- Telegram account (for notifications/chat)
+You run these steps on your laptop/desktop.
 
-### 2. Deploy to Fly
+- Install prerequisites:
+  - [Fly.io account](https://fly.io) + `flyctl`
+  - [Tailscale account](https://tailscale.com)
+  - SSH key pair
+  - Telegram account (optional, for chat)
 
 ```bash
 # Clone this repo
@@ -71,29 +72,51 @@ fly volumes create agent_data --size 10 --region sjc
 fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
 fly secrets set AUTHORIZED_KEYS="ssh-ed25519 AAAA... your-key"
 
+# Optional: webhook auth token
+fly secrets set WEBHOOK_AUTH_TOKEN="replace-me"
+
 # Deploy
 fly deploy
 ```
 
-### 3. Set Up Telegram (via Takopi)
+After deploy, find your Tailscale IP:
 
-SSH into your agent box and run the Takopi setup wizard:
+```bash
+fly ssh console -C "tailscale ip -4"
+```
+
+### 2. Remote VM setup
+
+You run these steps after SSH-ing into the VM.
 
 ```bash
 ssh -p 2222 agent@<tailscale-ip>
-takopi
 ```
 
-The wizard will guide you through:
+Clone your repos into the persistent volume:
 
-1. Creating a Telegram bot via @BotFather
-2. Entering your bot token
-3. Connecting your chat
-4. Saving config to `~/.takopi/takopi.toml`
+```bash
+cd /data/repos
+git clone git@github.com:your-org/your-repo.git
+```
 
-See `config/takopi.toml.example` for advanced configuration.
+Optional: configure project aliases and defaults:
 
-### 4. Start Using Agents
+```bash
+cp /opt/config/agentbox.toml.example /data/config/agentbox.toml
+vi /data/config/agentbox.toml
+```
+
+Optional: install Telegram support (Takopi):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv python install 3.13
+uv tool install -U takopi
+```
+
+### 3. Start using agents
 
 **Via SSH:**
 
@@ -113,7 +136,7 @@ cc-attach myproject
 # Detach: Ctrl-b d
 ```
 
-**Via Telegram:**
+**Via Telegram (optional):**
 
 Just message your bot! Takopi routes messages to Claude Code.
 
@@ -139,7 +162,7 @@ Takopi provides secure, authenticated Telegram integration:
 takopi
 
 # Or configure manually
-cp config/takopi.toml.example ~/.takopi/takopi.toml
+cp /opt/config/takopi.toml.example ~/.takopi/takopi.toml
 # Edit with your bot token and chat ID
 ```
 
@@ -163,6 +186,15 @@ curl -X POST "http://<tailscale-ip>:8080/send" \
   -d "message=your response"
 ```
 
+JSON payloads are also supported:
+
+```bash
+curl -X POST "http://<tailscale-ip>:8080/inbox" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"agent":"myproject","message":"hello","inject":true}'
+```
+
 ## Commands
 
 | Command                         | Description                     |
@@ -183,6 +215,7 @@ curl -X POST "http://<tailscale-ip>:8080/send" \
 | ------------------- | ------------------ | -------- |
 | `TAILSCALE_AUTHKEY` | Tailscale auth key | Required |
 | `AUTHORIZED_KEYS`   | SSH public keys    | Required |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token | Optional |
 
 ### Takopi Config (`~/.takopi/takopi.toml`)
 

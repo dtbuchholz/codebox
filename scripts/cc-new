@@ -115,21 +115,23 @@ setup_worktree() {
     mkdir -p "$worktrees_dir"
 
     # Check if branch exists locally or remotely
-    cd "$repo_dir"
+    (
+        cd "$repo_dir"
 
-    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
-        # Branch exists locally
-        echo "  Branch '$branch' exists locally"
-        git worktree add "$worktree_path" "$branch"
-    elif git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
-        # Branch exists on remote
-        echo "  Branch '$branch' exists on origin, checking out"
-        git worktree add "$worktree_path" -b "$branch" "origin/$branch"
-    else
-        # Create new branch from base
-        echo "  Creating new branch '$branch' from '$base_branch'"
-        git worktree add "$worktree_path" -b "$branch" "$base_branch"
-    fi
+        if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+            # Branch exists locally
+            echo "  Branch '$branch' exists locally"
+            git worktree add "$worktree_path" "$branch"
+        elif git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+            # Branch exists on remote
+            echo "  Branch '$branch' exists on origin, checking out"
+            git worktree add "$worktree_path" -b "$branch" "origin/$branch"
+        else
+            # Create new branch from base
+            echo "  Creating new branch '$branch' from '$base_branch'"
+            git worktree add "$worktree_path" -b "$branch" "$base_branch"
+        fi
+    )
 
     echo "$worktree_path"
 }

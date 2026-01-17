@@ -1,11 +1,13 @@
 #!/bin/bash
 # cc-ls - List all running Claude Code agents
 
+set -e
+
 echo "=== Claude Code Agents ==="
 echo ""
 
 # Get tmux sessions
-sessions=$(tmux ls 2>/dev/null)
+sessions=$(tmux ls 2>/dev/null || true)
 
 if [ -z "$sessions" ]; then
     echo "No agents running."
