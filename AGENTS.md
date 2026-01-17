@@ -14,30 +14,32 @@ Configuration for AI assistants working on this codebase.
 - **Fly.io**: Cloud platform with persistent volumes
 - **Tailscale**: Private network access (no public SSH)
 - **ntfy**: Push notifications
+- **just**: Task runner (alternative to Make)
+- **Prettier**: Formatting for MD/JSON/YAML
 
 ## Quick Commands
 
+Using `just` (recommended) or `make`:
+
 ```bash
 # First-time setup (installs tools + git hooks)
-make setup
-
-# Or run the bootstrap script (for fresh VMs)
-./scripts/bootstrap.sh
+just setup        # or: make setup
+./scripts/bootstrap.sh  # For fresh VMs
 
 # Quality checks
-make lint         # Run all linters
-make format       # Auto-format code
-make test         # Run tests
-make qa           # Full QA: lint + test + build
+just check        # Full QA: lint + test + build
+just lint         # Run all linters
+just format       # Auto-format code
+just test         # Run tests
 
 # Build & Deploy
-make build        # Build Docker image locally
-make deploy       # Deploy to Fly.io
+just build        # Build Docker image locally
+just deploy       # Deploy to Fly.io
 
 # Operations
-make status       # Check Fly machine status
-make logs         # View Fly logs
-make ssh          # SSH into the machine
+just status       # Check Fly machine status
+just logs         # View Fly logs
+just ssh          # SSH into the machine
 ```
 
 ## Architecture
@@ -49,10 +51,11 @@ codebox/
 │   ├── go.mod
 │   └── .golangci.yml     # Go linter config
 ├── scripts/              # Agent lifecycle CLI tools
-│   ├── cc-new            # Create new agent (tmux + claude)
+│   ├── cc-new            # Create new agent (supports @project/branch)
 │   ├── cc-stop           # Stop agent
 │   ├── cc-ls             # List running agents
 │   ├── cc-attach         # Attach to agent session
+│   ├── config.sh         # TOML config utilities
 │   ├── notify.sh         # Send ntfy push notification
 │   └── bootstrap.sh      # Fresh VM setup script
 ├── hooks/                # Claude Code notification hooks
@@ -60,11 +63,13 @@ codebox/
 │   └── prompt-hook.sh        # Input needed → push
 ├── config/               # Container configuration
 │   ├── entrypoint.sh     # Container startup (tailscale, sshd, webhook)
-│   ├── claude-settings.json  # Claude Code hook config
+│   ├── agentbox.toml.example # Agent box configuration template
 │   └── notify.conf.example   # Notification settings template
+├── justfile              # Task runner (alternative to Makefile)
+├── Makefile              # Build/deploy commands
 ├── Dockerfile            # Multi-stage build
 ├── fly.toml              # Fly.io deployment config
-└── deploy.sh             # Deployment script
+└── package.json          # Node deps (Prettier)
 ```
 
 ## Code Style

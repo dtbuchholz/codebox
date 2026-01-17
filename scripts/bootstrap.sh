@@ -172,6 +172,22 @@ install_pnpm() {
     fi
 }
 
+install_just() {
+    if command -v just &> /dev/null; then
+        echo "just already installed: $(just --version)"
+        return 0
+    fi
+
+    echo "Installing just..."
+    if [[ "$OS" == "macos" ]]; then
+        brew install just
+    else
+        # Linux: use prebuilt binary
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+        export PATH="$PATH:$HOME/.local/bin"
+    fi
+}
+
 install_flyctl() {
     if command -v fly &> /dev/null; then
         echo "flyctl already installed: $(fly version)"
@@ -222,6 +238,7 @@ install_golangci_lint
 install_pre_commit
 install_node
 install_pnpm
+install_just
 install_flyctl
 install_docker || true  # Don't fail if Docker install needs manual step
 
@@ -266,6 +283,7 @@ command -v golangci-lint &> /dev/null || MISSING="$MISSING golangci-lint"
 command -v pre-commit &> /dev/null || MISSING="$MISSING pre-commit"
 command -v node &> /dev/null || MISSING="$MISSING node"
 command -v pnpm &> /dev/null || MISSING="$MISSING pnpm"
+command -v just &> /dev/null || MISSING="$MISSING just"
 command -v fly &> /dev/null || MISSING="$MISSING flyctl"
 command -v docker &> /dev/null || MISSING="$MISSING docker"
 

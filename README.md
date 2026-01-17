@@ -15,28 +15,28 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Agent Box (Fly)                      │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  tmux sessions                                   │   │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐           │   │
-│  │  │ agent-1 │ │ agent-2 │ │ agent-3 │  ...      │   │
-│  │  │ claude  │ │ claude  │ │ claude  │           │   │
-│  │  └─────────┘ └─────────┘ └─────────┘           │   │
-│  └─────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  tmux sessions                                  │    │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐            │    │
+│  │  │ agent-1 │ │ agent-2 │ │ agent-3 │  ...       │    │
+│  │  │ claude  │ │ claude  │ │ claude  │            │    │
+│  │  └─────────┘ └─────────┘ └─────────┘            │    │
+│  └─────────────────────────────────────────────────┘    │
 │                                                         │
-│  ┌──────────┐  ┌───────────┐  ┌────────────────────┐  │
-│  │  sshd    │  │ tailscale │  │ webhook-receiver   │  │
-│  │  :2222   │  │           │  │      :8080         │  │
-│  └──────────┘  └───────────┘  └────────────────────┘  │
+│  ┌──────────┐  ┌───────────┐  ┌────────────────────┐    │
+│  │  sshd    │  │ tailscale │  │ webhook-receiver   │    │
+│  │  :2222   │  │           │  │      :8080         │    │
+│  └──────────┘  └───────────┘  └────────────────────┘    │
 │                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  /data (Fly Volume - persistent)                │   │
-│  │  ├── repos/         # Git repositories          │   │
-│  │  ├── worktrees/     # Git worktrees             │   │
-│  │  ├── logs/          # Agent logs                │   │
-│  │  ├── inbox/         # Reply-from-phone inbox    │   │
-│  │  ├── home/agent/    # Persistent home dir       │   │
-│  │  └── config/        # SSH keys, tailscale, etc  │   │
-│  └─────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  /data (Fly Volume - persistent)                │    │
+│  │  ├── repos/         # Git repositories          │    │
+│  │  ├── worktrees/     # Git worktrees             │    │
+│  │  ├── logs/          # Agent logs                │    │
+│  │  ├── inbox/         # Reply-from-phone inbox    │    │
+│  │  ├── home/agent/    # Persistent home dir       │    │
+│  │  └── config/        # SSH keys, tailscale, etc  │    │
+│  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
               │                         │
               │ Tailscale (private)     │ ntfy.sh (push)

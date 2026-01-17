@@ -1,0 +1,100 @@
+# Agent Box Configuration
+# Copy to /data/config/agentbox.toml and customize
+
+# =============================================================================
+# General Settings
+# =============================================================================
+[general]
+# Default working directory for new agents
+default_dir = "/data/repos"
+
+# Default shell for agents
+shell = "/bin/bash"
+
+# Auto-attach to new agents after creation
+auto_attach = false
+
+# =============================================================================
+# Git Worktree Settings
+# =============================================================================
+[worktrees]
+# Enable git worktree support
+enabled = true
+
+# Directory for worktrees (relative to repo root)
+dir = ".worktrees"
+
+# Default base branch for new worktrees
+base_branch = "main"
+
+# Auto-create worktree when @branch syntax is used
+auto_create = true
+
+# =============================================================================
+# Notification Settings
+# =============================================================================
+[notifications]
+# Enable push notifications
+enabled = true
+
+# ntfy server URL
+server = "https://ntfy.sh"
+
+# ntfy topic (make this unique and hard to guess)
+topic = "agent-box-CHANGEME"
+
+# Default priority: min, low, default, high, urgent
+priority = "default"
+
+# Notify on these events
+notify_on_prompt = true      # Agent waiting for input
+notify_on_error = true       # Agent encountered error
+notify_on_complete = false   # Agent completed task
+
+# =============================================================================
+# Webhook Settings
+# =============================================================================
+[webhook]
+# Enable webhook receiver
+enabled = true
+
+# Listen address
+addr = ":8080"
+
+# Auth token (optional, for securing the webhook)
+# auth_token = "your-secret-token"
+
+# Enable tmux injection (send messages directly to agent)
+allow_inject = true
+
+# =============================================================================
+# Project Aliases
+# =============================================================================
+# Define shortcuts for common repos/directories
+# Usage: cc-new myagent @myproject
+#        cc-new myagent @myproject/feature-branch
+
+[projects.myproject]
+path = "/data/repos/myproject"
+worktrees_dir = ".worktrees"
+base_branch = "main"
+
+# [projects.another]
+# path = "/data/repos/another-repo"
+# base_branch = "develop"
+
+# =============================================================================
+# Agent Defaults
+# =============================================================================
+[agent]
+# Default Claude Code arguments
+claude_args = ""
+
+# Session name prefix
+name_prefix = ""
+
+# Log directory
+log_dir = "/data/logs"
+
+# Inbox directory (for reply-from-phone)
+inbox_dir = "/data/inbox"

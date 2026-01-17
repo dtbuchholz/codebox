@@ -28,10 +28,9 @@ primary_region = "sjc"
   initial_size = "10gb"
 
 # Machine configuration
-[vm]
+[[vm]]
   size = "shared-cpu-2x"
   memory = "2gb"
-  cpus = 2
 
 # Process configuration
 [processes]

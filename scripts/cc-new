@@ -1,29 +1,168 @@
 #!/bin/bash
 # cc-new - Create a new Claude Code agent in a tmux session
+#
+# Supports project aliases and git worktrees:
+#   cc-new myagent @myproject           # Use project alias
+#   cc-new myagent @myproject/feature   # Create worktree for branch
 
 set -e
 
+# Source config utilities
+SCRIPT_DIR="$(dirname "$0")"
+# shellcheck source=config.sh
+source "$SCRIPT_DIR/config.sh" 2>/dev/null || true
+
 usage() {
-    echo "Usage: cc-new <agent-name> [directory]"
+    echo "Usage: cc-new <agent-name> [directory|@project[/branch]]"
     echo ""
     echo "Create a new Claude Code agent in a tmux session."
     echo ""
     echo "Arguments:"
     echo "  agent-name   Name for the tmux session (required)"
-    echo "  directory    Working directory (default: /data/repos)"
+    echo "  directory    Working directory, or:"
+    echo "    @project       Use configured project path"
+    echo "    @project/branch Create/use git worktree for branch"
+    echo ""
+    echo "Options:"
+    echo "  --attach     Auto-attach after creation"
     echo ""
     echo "Examples:"
     echo "  cc-new myproject /data/repos/myproject"
-    echo "  cc-new feature-auth /data/worktrees/myrepo/auth-branch"
+    echo "  cc-new auth @myproject/feature-auth"
+    echo "  cc-new bugfix @myproject"
+    echo ""
+
+    # Show configured projects if available
+    if type list_projects &>/dev/null; then
+        projects=$(list_projects)
+        if [[ -n "$projects" ]]; then
+            echo "Configured projects:"
+            for p in $projects; do
+                path=$(project_path "$p")
+                echo "  @$p -> $path"
+            done
+            echo ""
+        fi
+    fi
+
     exit 1
 }
 
-if [ -z "$1" ]; then
+# Parse a @project/branch reference
+# Sets: PROJECT_ALIAS, BRANCH_NAME, PROJECT_PATH
+parse_project_ref() {
+    local ref="$1"
+
+    # Remove @ prefix
+    ref="${ref#@}"
+
+    # Check if it includes a branch (contains /)
+    if [[ "$ref" == *"/"* ]]; then
+        PROJECT_ALIAS="${ref%%/*}"
+        BRANCH_NAME="${ref#*/}"
+    else
+        PROJECT_ALIAS="$ref"
+        BRANCH_NAME=""
+    fi
+
+    # Look up project path
+    if type project_path &>/dev/null; then
+        PROJECT_PATH=$(project_path "$PROJECT_ALIAS")
+    fi
+
+    if [[ -z "$PROJECT_PATH" ]]; then
+        echo "Error: Unknown project alias '@$PROJECT_ALIAS'"
+        echo "Configure it in /data/config/agentbox.toml under [projects.$PROJECT_ALIAS]"
+        exit 1
+    fi
+}
+
+# Create or checkout a git worktree
+# Returns the worktree directory path
+setup_worktree() {
+    local repo_dir="$1"
+    local branch="$2"
+
+    # Get worktree settings
+    local worktrees_dir
+    if [[ -n "$PROJECT_ALIAS" ]] && type project_worktrees_dir &>/dev/null; then
+        worktrees_dir=$(project_worktrees_dir "$PROJECT_ALIAS")
+    else
+        local rel_dir
+        rel_dir=$(config_get "worktrees.dir" ".worktrees")
+        worktrees_dir="${repo_dir}/${rel_dir}"
+    fi
+
+    local base_branch
+    if [[ -n "$PROJECT_ALIAS" ]] && type project_base_branch &>/dev/null; then
+        base_branch=$(project_base_branch "$PROJECT_ALIAS")
+    else
+        base_branch=$(config_get "worktrees.base_branch" "main")
+    fi
+
+    local worktree_path="${worktrees_dir}/${branch}"
+
+    # Check if worktree already exists
+    if [[ -d "$worktree_path" ]]; then
+        echo "Using existing worktree: $worktree_path"
+        echo "$worktree_path"
+        return 0
+    fi
+
+    echo "Creating worktree for branch '$branch'..."
+
+    # Ensure worktrees directory exists
+    mkdir -p "$worktrees_dir"
+
+    # Check if branch exists locally or remotely
+    cd "$repo_dir"
+
+    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+        # Branch exists locally
+        echo "  Branch '$branch' exists locally"
+        git worktree add "$worktree_path" "$branch"
+    elif git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+        # Branch exists on remote
+        echo "  Branch '$branch' exists on origin, checking out"
+        git worktree add "$worktree_path" -b "$branch" "origin/$branch"
+    else
+        # Create new branch from base
+        echo "  Creating new branch '$branch' from '$base_branch'"
+        git worktree add "$worktree_path" -b "$branch" "$base_branch"
+    fi
+
+    echo "$worktree_path"
+}
+
+# Main script
+if [[ -z "$1" ]]; then
     usage
 fi
 
 AGENT_NAME="$1"
-WORK_DIR="${2:-/data/repos}"
+LOCATION="${2:-}"
+AUTO_ATTACH=""
+
+# Parse options
+shift
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --attach)
+            AUTO_ATTACH="1"
+            shift
+            ;;
+        @*)
+            LOCATION="$1"
+            shift
+            ;;
+        *)
+            if [[ -z "$LOCATION" ]]; then
+                LOCATION="$1"
+            fi
+            shift
+            ;;
+    esac
+done
 
 # Validate agent name (alphanumeric, dash, underscore only)
 if ! [[ "$AGENT_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -38,37 +177,87 @@ if tmux has-session -t "$AGENT_NAME" 2>/dev/null; then
     exit 1
 fi
 
+# Determine working directory
+WORK_DIR=""
+PROJECT_ALIAS=""
+BRANCH_NAME=""
+PROJECT_PATH=""
+
+if [[ "$LOCATION" == @* ]]; then
+    # Project reference
+    parse_project_ref "$LOCATION"
+
+    if [[ -n "$BRANCH_NAME" ]]; then
+        # Create/use worktree for branch
+        WORK_DIR=$(setup_worktree "$PROJECT_PATH" "$BRANCH_NAME")
+    else
+        # Use project root
+        WORK_DIR="$PROJECT_PATH"
+    fi
+elif [[ -n "$LOCATION" ]]; then
+    WORK_DIR="$LOCATION"
+else
+    # Default directory from config or fallback
+    if type config_get &>/dev/null; then
+        WORK_DIR=$(config_get "general.default_dir" "/data/repos")
+    else
+        WORK_DIR="/data/repos"
+    fi
+fi
+
 # Create working directory if it doesn't exist
 mkdir -p "$WORK_DIR"
 
 # Create log directory for this agent
 LOG_DIR="/data/logs/$AGENT_NAME"
+if type config_get &>/dev/null; then
+    LOG_DIR=$(config_get "agent.log_dir" "/data/logs")
+    LOG_DIR="${LOG_DIR}/${AGENT_NAME}"
+fi
 mkdir -p "$LOG_DIR"
 
 # Create inbox file for this agent (for reply-from-phone)
-INBOX_FILE="/data/inbox/$AGENT_NAME.txt"
+INBOX_DIR="/data/inbox"
+if type config_get &>/dev/null; then
+    INBOX_DIR=$(config_get "agent.inbox_dir" "/data/inbox")
+fi
+INBOX_FILE="${INBOX_DIR}/${AGENT_NAME}.txt"
+mkdir -p "$INBOX_DIR"
 touch "$INBOX_FILE"
 
 echo "Creating agent '$AGENT_NAME'..."
 echo "  Working directory: $WORK_DIR"
+if [[ -n "$PROJECT_ALIAS" ]]; then
+    echo "  Project: @$PROJECT_ALIAS"
+fi
+if [[ -n "$BRANCH_NAME" ]]; then
+    echo "  Branch: $BRANCH_NAME"
+fi
 echo "  Log directory: $LOG_DIR"
 echo "  Inbox file: $INBOX_FILE"
 
 # Create tmux session with Claude Code
-# Using -d to create detached, then we'll attach
 tmux new-session -d -s "$AGENT_NAME" -c "$WORK_DIR"
 
 # Set up the environment in the session
 tmux send-keys -t "$AGENT_NAME" "export AGENT_NAME='$AGENT_NAME'" Enter
 tmux send-keys -t "$AGENT_NAME" "export AGENT_LOG_DIR='$LOG_DIR'" Enter
 tmux send-keys -t "$AGENT_NAME" "export AGENT_INBOX='$INBOX_FILE'" Enter
+if [[ -n "$PROJECT_ALIAS" ]]; then
+    tmux send-keys -t "$AGENT_NAME" "export AGENT_PROJECT='$PROJECT_ALIAS'" Enter
+fi
+if [[ -n "$BRANCH_NAME" ]]; then
+    tmux send-keys -t "$AGENT_NAME" "export AGENT_BRANCH='$BRANCH_NAME'" Enter
+fi
 
-# Add a small pane at the bottom for inbox monitoring (optional split)
-# tmux split-window -t "$AGENT_NAME" -v -l 5 "tail -f $INBOX_FILE"
-# tmux select-pane -t "$AGENT_NAME:0.0"
+# Get Claude args from config
+CLAUDE_ARGS=""
+if type config_get &>/dev/null; then
+    CLAUDE_ARGS=$(config_get "agent.claude_args" "")
+fi
 
 # Start Claude Code
-tmux send-keys -t "$AGENT_NAME" "clear && echo '=== Agent: $AGENT_NAME ===' && echo 'Directory: $WORK_DIR' && echo '' && claude" Enter
+tmux send-keys -t "$AGENT_NAME" "clear && echo '=== Agent: $AGENT_NAME ===' && echo 'Directory: $WORK_DIR' && echo '' && claude $CLAUDE_ARGS" Enter
 
 echo ""
 echo "Agent '$AGENT_NAME' created!"
@@ -76,8 +265,12 @@ echo ""
 echo "To attach: cc-attach $AGENT_NAME"
 echo "To stop:   cc-stop $AGENT_NAME"
 
-# Optionally auto-attach
-if [ "$AUTO_ATTACH" = "1" ] || [ "$3" = "--attach" ]; then
+# Check auto-attach config or flag
+if [[ -z "$AUTO_ATTACH" ]] && type config_enabled &>/dev/null; then
+    config_enabled "general.auto_attach" && AUTO_ATTACH="1"
+fi
+
+if [[ "$AUTO_ATTACH" = "1" ]]; then
     echo ""
     echo "Attaching..."
     tmux attach-session -t "$AGENT_NAME"
