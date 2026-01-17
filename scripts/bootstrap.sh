@@ -188,6 +188,34 @@ install_just() {
     fi
 }
 
+install_uv() {
+    if command -v uv &> /dev/null; then
+        echo "uv already installed: $(uv --version)"
+        return 0
+    fi
+
+    echo "Installing uv (Python package manager)..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+}
+
+install_takopi() {
+    if command -v takopi &> /dev/null; then
+        echo "takopi already installed: $(takopi --version 2>/dev/null || echo 'installed')"
+        return 0
+    fi
+
+    echo "Installing Takopi (Telegram transport for Claude)..."
+    # Ensure uv is installed first
+    install_uv
+
+    # Install Python 3.13+ if needed (takopi requires it)
+    uv python install 3.13 2>/dev/null || true
+
+    # Install takopi
+    uv tool install -U takopi
+}
+
 install_flyctl() {
     if command -v fly &> /dev/null; then
         echo "flyctl already installed: $(fly version)"
@@ -239,6 +267,7 @@ install_pre_commit
 install_node
 install_pnpm
 install_just
+install_takopi
 install_flyctl
 install_docker || true  # Don't fail if Docker install needs manual step
 
@@ -284,6 +313,7 @@ command -v pre-commit &> /dev/null || MISSING="$MISSING pre-commit"
 command -v node &> /dev/null || MISSING="$MISSING node"
 command -v pnpm &> /dev/null || MISSING="$MISSING pnpm"
 command -v just &> /dev/null || MISSING="$MISSING just"
+command -v takopi &> /dev/null || MISSING="$MISSING takopi"
 command -v fly &> /dev/null || MISSING="$MISSING flyctl"
 command -v docker &> /dev/null || MISSING="$MISSING docker"
 

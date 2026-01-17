@@ -1,0 +1,104 @@
+# Takopi Configuration for Agent Box
+# Copy to ~/.takopi/takopi.toml and customize
+#
+# First-time setup: run `takopi` to launch the interactive wizard
+# Documentation: https://takopi.dev
+
+# =============================================================================
+# General Settings
+# =============================================================================
+
+# Hot-reload config changes (transport settings excluded)
+watch_config = true
+
+# Default AI engine: "claude", "codex", "opencode", "pi"
+default_engine = "claude"
+
+# Default project alias (optional)
+# default_project = "myproject"
+
+# Transport backend
+transport = "telegram"
+
+# =============================================================================
+# Telegram Transport
+# =============================================================================
+[transports.telegram]
+
+# Get from @BotFather on Telegram
+bot_token = "YOUR_BOT_TOKEN"
+
+# Your Telegram chat ID (bot will tell you on first message)
+chat_id = 0
+
+# How to handle long responses: "trim" or "split"
+message_overflow = "split"
+
+# Seconds to wait before sending batched forwarded messages
+forward_coalesce_s = 1.0
+
+# Session persistence: "chat" (resume) or "stateless"
+session_mode = "chat"
+
+# Show resume footer in messages
+show_resume_line = true
+
+# When to respond: "all" or "mentions" (only @mentions, commands, replies)
+trigger_mode = "all"
+
+# -----------------------------------------------------------------------------
+# Voice Notes
+# -----------------------------------------------------------------------------
+# Transcribe voice notes to text (requires OPENAI_API_KEY)
+voice_transcription = true
+voice_transcription_model = "gpt-4o-mini-transcribe"
+voice_max_bytes = 10485760  # 10MB
+
+# -----------------------------------------------------------------------------
+# Forum Topics (for multiple agents)
+# -----------------------------------------------------------------------------
+[transports.telegram.topics]
+# Enable topic-based routing (one topic per agent/project)
+enabled = true
+
+# Scope: "auto", "main", "projects", "all"
+# - auto: only project-bound topics
+# - main: only main thread
+# - projects: all project topics
+# - all: respond in any topic
+scope = "auto"
+
+# -----------------------------------------------------------------------------
+# File Transfers
+# -----------------------------------------------------------------------------
+[transports.telegram.files]
+enabled = true
+auto_put = true
+uploads_dir = "incoming"
+
+# =============================================================================
+# Project Configuration
+# =============================================================================
+# Bind projects to directories and optionally to Telegram topics
+
+[projects.codebox]
+path = "/data/repos/codebox"
+worktrees_dir = ".worktrees"
+base_branch = "main"
+# chat_id = 0  # Bind to specific chat/topic
+
+# [projects.myproject]
+# path = "/data/repos/myproject"
+# default_engine = "claude"
+# base_branch = "main"
+
+# =============================================================================
+# Engine-Specific Settings
+# =============================================================================
+
+[claude]
+# Additional arguments for Claude Code
+# args = "--allowedTools Edit,Read,Write"
+
+# [codex]
+# model = "gpt-4"

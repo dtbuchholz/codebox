@@ -1,14 +1,14 @@
 # Agent Box
 
-A remote "agent box" on Fly.io for running long-lived Claude Code sessions inside tmux. Connect via SSH from anywhere (including iOS), and get phone notifications when an agent needs input.
+A remote "agent box" on Fly.io for running long-lived Claude Code sessions inside tmux. Connect via SSH from anywhere (including iOS), and interact via Telegram with voice support.
 
 ## Features
 
 - **Persistent sessions**: Run Claude Code in tmux sessions that survive disconnects
 - **Multi-agent support**: Run multiple agents in parallel with isolated working directories
+- **Telegram integration**: Chat with agents via [Takopi](https://takopi.dev) - text, voice, files
 - **Phone-first access**: Connect via Tailscale + SSH from iOS (Blink, Termius)
-- **Push notifications**: Get notified via ntfy when agents need input
-- **Reply from phone**: Send messages to agents via webhook (optional)
+- **Git worktrees**: Each agent can work on its own branch without conflicts
 
 ## Architecture
 
@@ -24,8 +24,8 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 │  └─────────────────────────────────────────────────┘    │
 │                                                         │
 │  ┌──────────┐  ┌───────────┐  ┌────────────────────┐    │
-│  │  sshd    │  │ tailscale │  │ webhook-receiver   │    │
-│  │  :2222   │  │           │  │      :8080         │    │
+│  │  sshd    │  │ tailscale │  │     takopi         │    │
+│  │  :2222   │  │           │  │  (telegram bot)    │    │
 │  └──────────┘  └───────────┘  └────────────────────┘    │
 │                                                         │
 │  ┌─────────────────────────────────────────────────┐    │
@@ -33,17 +33,16 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 │  │  ├── repos/         # Git repositories          │    │
 │  │  ├── worktrees/     # Git worktrees             │    │
 │  │  ├── logs/          # Agent logs                │    │
-│  │  ├── inbox/         # Reply-from-phone inbox    │    │
 │  │  ├── home/agent/    # Persistent home dir       │    │
 │  │  └── config/        # SSH keys, tailscale, etc  │    │
 │  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
               │                         │
-              │ Tailscale (private)     │ ntfy.sh (push)
+              │ Tailscale (private)     │ Telegram (encrypted)
               ▼                         ▼
         ┌──────────┐             ┌──────────┐
-        │  iPhone  │◄────────────│  Phone   │
-        │  (SSH)   │             │  (push)  │
+        │  iPhone  │             │  Phone   │
+        │  (SSH)   │             │ (chat)   │
         └──────────┘             └──────────┘
 ```
 
@@ -54,7 +53,7 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 - [Fly.io account](https://fly.io) with `flyctl` installed
 - [Tailscale account](https://tailscale.com)
 - SSH key pair
-- [ntfy](https://ntfy.sh) topic for notifications
+- Telegram account (for notifications/chat)
 
 ### 2. Deploy to Fly
 
@@ -71,25 +70,39 @@ fly volumes create agent_data --size 10 --region sjc
 # Set secrets
 fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
 fly secrets set AUTHORIZED_KEYS="ssh-ed25519 AAAA... your-key"
-fly secrets set NTFY_TOPIC="your-unique-topic"
-fly secrets set WEBHOOK_AUTH_TOKEN="your-secret-token"  # Optional
 
 # Deploy
 fly deploy
 ```
 
-### 3. Connect via Tailscale
+### 3. Set Up Telegram (via Takopi)
 
-1. Install Tailscale on your devices
-2. Connect to your tailnet
-3. Find the agent-box IP: `tailscale status`
-4. SSH in: `ssh -p 2222 agent@<tailscale-ip>`
+SSH into your agent box and run the Takopi setup wizard:
+
+```bash
+ssh -p 2222 agent@<tailscale-ip>
+takopi
+```
+
+The wizard will guide you through:
+
+1. Creating a Telegram bot via @BotFather
+2. Entering your bot token
+3. Connecting your chat
+4. Saving config to `~/.takopi/takopi.toml`
+
+See `config/takopi.toml.example` for advanced configuration.
 
 ### 4. Start Using Agents
+
+**Via SSH:**
 
 ```bash
 # Create a new agent
 cc-new myproject /data/repos/myproject
+
+# Or use project aliases with worktrees
+cc-new feature @myproject/feature-branch
 
 # List agents
 cc-ls
@@ -98,72 +111,113 @@ cc-ls
 cc-attach myproject
 
 # Detach: Ctrl-b d
-
-# Stop an agent
-cc-stop myproject
 ```
 
-## Configuration
+**Via Telegram:**
 
-### Environment Variables
+Just message your bot! Takopi routes messages to Claude Code.
 
-| Variable             | Description             | Default           |
-| -------------------- | ----------------------- | ----------------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key      | Required          |
-| `AUTHORIZED_KEYS`    | SSH public keys         | Required          |
-| `NTFY_TOPIC`         | ntfy topic name         | `agent-box`       |
-| `NTFY_SERVER`        | ntfy server URL         | `https://ntfy.sh` |
-| `WEBHOOK_AUTH_TOKEN` | Auth token for webhook  | None              |
-| `ENABLE_WEBHOOK`     | Enable webhook receiver | `1`               |
+- Use `/project myproject` to set context
+- Use `@branch-name` to work on a specific branch
+- Send voice notes - they're transcribed automatically
+- Send files - they're saved to the project
 
-### Notifications
+## Communication Options
 
-1. Install the ntfy app on your phone
-2. Subscribe to your topic
-3. Notifications will be sent when agents need input
+### Option 1: Telegram via Takopi (Recommended)
 
-Configure notification preferences in `/data/config/notify.conf`:
+Takopi provides secure, authenticated Telegram integration:
+
+- **End-to-end encrypted** (Telegram's encryption)
+- **Voice note transcription** (reply by voice)
+- **File transfers** (send/receive files)
+- **Session persistence** (resume conversations)
+- **Forum topics** (one topic per agent)
 
 ```bash
-NTFY_SERVER="https://ntfy.sh"
-NTFY_TOPIC="your-unique-topic"
-NTFY_PRIORITY="default"
+# Run setup wizard
+takopi
+
+# Or configure manually
+cp config/takopi.toml.example ~/.takopi/takopi.toml
+# Edit with your bot token and chat ID
 ```
 
-### Reply from Phone (Webhook)
+### Option 2: SSH + tmux
 
-Send messages to agents via HTTP:
+Direct terminal access via Tailscale:
 
 ```bash
-# Send to inbox (agent sees it in log)
-curl -X POST "http://<tailscale-ip>:8080/inbox" \
-  -d "agent=myproject" \
-  -d "message=your response here"
+ssh -p 2222 agent@<tailscale-ip>
+cc-attach myproject
+```
 
-# Send and inject into tmux (types directly)
+### Option 3: Webhook (Legacy)
+
+HTTP webhook for custom integrations:
+
+```bash
 curl -X POST "http://<tailscale-ip>:8080/send" \
-  -d "agent=myproject" \
-  -d "message=your response here"
-```
-
-With auth token:
-
-```bash
-curl -X POST "http://<tailscale-ip>:8080/inbox?token=your-secret" \
+  -H "Authorization: Bearer $TOKEN" \
   -d "agent=myproject" \
   -d "message=your response"
 ```
 
 ## Commands
 
-| Command               | Description                     |
-| --------------------- | ------------------------------- |
-| `cc-ls`               | List all running agents         |
-| `cc-new <name> <dir>` | Create a new agent in directory |
-| `cc-attach <name>`    | Attach to an existing agent     |
-| `cc-stop <name>`      | Stop an agent                   |
-| `cc-stop --all`       | Stop all agents                 |
-| `notify.sh <msg>`     | Send a test notification        |
+| Command                         | Description                     |
+| ------------------------------- | ------------------------------- |
+| `cc-ls`                         | List all running agents         |
+| `cc-new <name> <dir>`           | Create a new agent in directory |
+| `cc-new <name> @project/branch` | Create agent with git worktree  |
+| `cc-attach <name>`              | Attach to an existing agent     |
+| `cc-stop <name>`                | Stop an agent                   |
+| `cc-stop --all`                 | Stop all agents                 |
+| `takopi`                        | Run Takopi (Telegram interface) |
+
+## Configuration
+
+### Environment Variables
+
+| Variable            | Description        | Default  |
+| ------------------- | ------------------ | -------- |
+| `TAILSCALE_AUTHKEY` | Tailscale auth key | Required |
+| `AUTHORIZED_KEYS`   | SSH public keys    | Required |
+
+### Takopi Config (`~/.takopi/takopi.toml`)
+
+```toml
+default_engine = "claude"
+transport = "telegram"
+
+[transports.telegram]
+bot_token = "YOUR_BOT_TOKEN"
+chat_id = 123456789
+voice_transcription = true
+session_mode = "chat"
+
+[transports.telegram.topics]
+enabled = true  # Use forum topics for multiple agents
+
+[projects.myproject]
+path = "/data/repos/myproject"
+```
+
+### Agent Box Config (`/data/config/agentbox.toml`)
+
+```toml
+[general]
+default_dir = "/data/repos"
+auto_attach = false
+
+[worktrees]
+enabled = true
+dir = ".worktrees"
+base_branch = "main"
+
+[projects.myproject]
+path = "/data/repos/myproject"
+```
 
 ## Directory Structure
 
@@ -172,18 +226,25 @@ curl -X POST "http://<tailscale-ip>:8080/inbox?token=your-secret" \
 ├── repos/              # Clone your repositories here
 ├── worktrees/          # Git worktrees (one per agent/branch)
 ├── logs/<agent>/       # Logs per agent
-├── inbox/<agent>.txt   # Reply-from-phone messages
 ├── home/agent/         # Persistent home directory
 │   ├── .claude/        # Claude Code config & hooks
+│   ├── .takopi/        # Takopi config & state
 │   └── .ssh/           # SSH authorized_keys
 └── config/
-    ├── authorized_keys # SSH keys (alternative location)
-    ├── notify.conf     # Notification settings
+    ├── agentbox.toml   # Agent box settings
     ├── tailscale.state # Tailscale state
     └── ssh_host_*      # SSH host keys
 ```
 
 ## iOS Workflow
+
+### Via Telegram (Easiest)
+
+1. Open Telegram
+2. Message your bot
+3. Chat with Claude directly
+
+### Via SSH
 
 1. **Tailscale app**: Connect to your tailnet
 2. **SSH app** (Blink/Termius): Save a profile for `agent@<tailscale-ip>:2222`
@@ -192,26 +253,11 @@ curl -X POST "http://<tailscale-ip>:8080/inbox?token=your-secret" \
 5. **Respond to Claude**: Type your response
 6. **Detach**: `Ctrl-b d`
 
-## Upgrade Path: Machine per Agent
-
-For stronger isolation, you can run each agent as its own Fly Machine:
-
-```bash
-# Create a new machine for an agent
-fly machines run . --name agent-feature-x \
-  --volume agent_feature_x_data:/data \
-  --env AGENT_NAME=feature-x
-
-# Stop/destroy the machine when done
-fly machines stop <machine-id>
-fly machines destroy <machine-id>
-```
-
 ## Security
 
 - **Tailscale-only access**: No public ports exposed
 - **SSH key auth only**: Password auth disabled
-- **Webhook auth**: Optional token for webhook endpoints
+- **Telegram encryption**: Bot token + chat ID authentication
 - **Non-root user**: Agents run as `agent` user
 
 ## Troubleshooting
@@ -222,17 +268,17 @@ fly machines destroy <machine-id>
 - Verify SSH key is set: `fly secrets list`
 - Check logs: `fly logs`
 
+### Telegram not working
+
+- Verify bot token: message @BotFather
+- Check Takopi config: `cat ~/.takopi/takopi.toml`
+- View Takopi logs: `takopi --verbose`
+
 ### Agent not starting
 
 - Check tmux: `tmux ls`
 - Check Claude Code: `which claude`
 - View logs: `cat /data/logs/<agent>/`
-
-### Notifications not working
-
-- Test manually: `notify.sh -a test "Hello"`
-- Check ntfy subscription
-- Verify topic: `echo $NTFY_TOPIC`
 
 ## License
 
