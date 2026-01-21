@@ -262,16 +262,19 @@ Takopi provides secure, authenticated Telegram integration:
    path = "/data/repos/myproject"
    ```
 
-6. **Run Takopi** in a tmux session (so it persists after disconnect):
+6. **Takopi auto-starts** on VM boot if configured. To manually start/restart:
 
    ```bash
-   # Use bash -l to ensure environment variables from ~/.bashrc are loaded
-   tmux new -s takopi -d 'bash -l -c takopi'
+   # Start Takopi (or restart if already running)
+   tmux kill-session -t takopi 2>/dev/null; tmux new -s takopi -d 'bash -l -c takopi'
 
    # View logs
    tmux attach -t takopi
    # Press Ctrl-b d to detach
    ```
+
+   > **Note**: If Takopi fails to start automatically, check `/data/logs/healthcheck.log` for errors.
+   > The health check watchdog will attempt to restart Takopi and notify you via ntfy if configured.
 
 > **Note**: If you configured Takopi locally first, copy the config to the VM:
 >
@@ -432,13 +435,16 @@ path = "/data/repos/myproject"
 /data/
 ├── repos/              # Clone your repositories here
 ├── worktrees/          # Git worktrees (one per agent/branch)
-├── logs/<agent>/       # Logs per agent
+├── logs/
+│   ├── <agent>/        # Logs per agent
+│   └── healthcheck.log # Health monitor logs
 ├── home/agent/         # Persistent home directory
 │   ├── .claude/        # Claude Code config & hooks
 │   ├── .takopi/        # Takopi config & state
 │   └── .ssh/           # SSH authorized_keys
 └── config/
     ├── agentbox.toml   # Agent box settings
+    ├── notify.conf     # Push notification settings
     ├── tailscale.state # Tailscale state
     └── ssh_host_*      # SSH host keys
 ```
@@ -459,6 +465,49 @@ path = "/data/repos/myproject"
 4. **Attach**: `cc-attach <agent-name>`
 5. **Respond to Claude**: Type your response
 6. **Detach**: `Ctrl-b d`
+
+## Health Monitoring
+
+Agent Box includes automatic health monitoring that:
+
+- **Auto-starts Takopi** on VM boot (if configured)
+- **Monitors services** (Takopi, Tailscale, SSH) every 60 seconds
+- **Auto-restarts Takopi** if it crashes
+- **Sends push notifications** via ntfy when issues are detected
+
+### Setup Notifications
+
+1. Create a unique ntfy topic at [ntfy.sh](https://ntfy.sh) or self-host
+2. Configure on the VM:
+
+   ```bash
+   cp /opt/notify.conf.example /data/config/notify.conf
+   vi /data/config/notify.conf
+   # Set NTFY_TOPIC to your unique topic name
+   ```
+
+3. Subscribe to your topic in the ntfy app (iOS/Android) or web
+
+### Health Check Commands
+
+```bash
+# Run health check manually
+healthcheck.sh
+
+# View health check logs
+tail -f /data/logs/healthcheck.log
+
+# Disable auto-restart (env var)
+ENABLE_HEALTHCHECK=0
+```
+
+### What Gets Monitored
+
+| Service | Check | Auto-Recovery |
+| ------- | ----- | ------------- |
+| Takopi | tmux session exists | Yes - restarts automatically |
+| Tailscale | `tailscale status` | No - notifies only |
+| SSH | `pgrep sshd` | No - notifies only |
 
 ## Security
 

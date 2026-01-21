@@ -74,7 +74,7 @@ COPY --from=webhook-builder /build/webhook-receiver /usr/local/bin/
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/notify.sh /usr/local/bin/webhook-receiver 2>/dev/null || true
+RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/notify.sh /usr/local/bin/healthcheck.sh /usr/local/bin/webhook-receiver 2>/dev/null || true
 
 # Copy hooks
 COPY hooks/ /opt/hooks/

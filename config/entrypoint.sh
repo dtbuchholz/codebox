@@ -110,11 +110,40 @@ if [ -d "/opt/hooks" ]; then
 fi
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
+# Auto-start Takopi if configured
+if [ -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
+    echo "Starting Takopi (Telegram bot)..."
+    if command -v takopi &> /dev/null || [ -x "$AGENT_HOME/.local/bin/takopi" ]; then
+        su - agent -c "tmux new-session -d -s takopi 'bash -l -c takopi'" 2>/dev/null && \
+            echo "Takopi started in tmux session 'takopi'" || \
+            echo "Warning: Failed to start Takopi"
+    else
+        echo "Takopi configured but not installed. Run: uv tool install takopi"
+    fi
+else
+    echo "Takopi not configured (no ~/.takopi/takopi.toml)"
+fi
+
+# Start health check watchdog in background
+if [ "${ENABLE_HEALTHCHECK:-1}" = "1" ]; then
+    echo "Starting health check watchdog..."
+    /usr/local/bin/healthcheck.sh --watch >> /data/logs/healthcheck.log 2>&1 &
+    HEALTHCHECK_PID=$!
+fi
+
 echo "=== Agent Box Ready ==="
 echo "SSH: port 2222"
 echo "Webhook: port 8080"
 echo "Tailscale: $(tailscale ip -4 2>/dev/null || echo 'pending auth')"
+echo "Takopi: $(su - agent -c 'tmux has-session -t takopi 2>/dev/null' && echo 'running' || echo 'not running')"
+
+# Send startup notification if configured
+if [ -f "/data/config/notify.conf" ]; then
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo 'pending')
+    /usr/local/bin/notify.sh -t "Agent Box Started" --tags "rocket" \
+        "Agent Box is ready. Tailscale IP: $TAILSCALE_IP" 2>/dev/null || true
+fi
 
 # Keep container running (wait for any child process)
 # shellcheck disable=SC2086
-wait -n $SSHD_PID ${WEBHOOK_PID:-}
+wait -n $SSHD_PID ${WEBHOOK_PID:-} ${HEALTHCHECK_PID:-}
