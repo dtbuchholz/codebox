@@ -120,6 +120,13 @@ cd /data/repos
 git clone git@github.com:your-org/your-repo.git
 ```
 
+Authenticate GitHub CLI (for Claude to interact with issues, PRs, etc.):
+
+```bash
+gh auth login
+# Follow prompts - choose HTTPS and authenticate via browser or token
+```
+
 Optional: configure project aliases and defaults:
 
 ```bash
@@ -152,10 +159,12 @@ echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
 ```bash
 cat >> ~/.bashrc << 'EOF'
 export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_AUTH_TOKEN="sk-or-v1-..."
-export ANTHROPIC_API_KEY=""
+export ANTHROPIC_API_KEY="sk-or-v1-..."
 EOF
 ```
+
+> **Note**: Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`) with OpenRouter.
+> Claude Code and Takopi both expect this variable name.
 
 **Option C: Interactive login**
 
@@ -280,6 +289,38 @@ ssh agent@agent-box-<yourname>
 cc-attach myproject
 ```
 
+### Multi-Device Access
+
+You can access agents from both your phone and laptop, but the two access methods work differently:
+
+| Method | How Claude runs | Multi-device access |
+| ------ | --------------- | ------------------- |
+| Telegram (Takopi) | Subprocess of Takopi | Open Telegram on any device |
+| SSH (cc-* scripts) | tmux session | `cc-attach` from any SSH session |
+
+**Takopi sessions** run Claude as a subprocess - you can't attach via SSH, but you can open Telegram on your laptop and message the same bot. Both devices see the same conversation.
+
+**tmux sessions** (via `cc-new`/`cc-attach`) are independent from Takopi. Multiple SSH sessions can attach to the same tmux session simultaneously:
+
+```bash
+# Terminal 1 (laptop)
+ssh agent@agent-box-yourname
+cc-attach myagent
+
+# Terminal 2 (another laptop, or phone via Blink/Termius)
+ssh agent@agent-box-yourname
+cc-attach myagent
+# Both terminals now show the same Claude session
+```
+
+**Bridging both methods**: If you start a session via SSH and want to continue from Telegram (or vice versa), use Claude's resume feature:
+
+```bash
+# In SSH tmux session, note the session ID from Claude's output
+# Then in Telegram:
+/claude --resume <session-id> continue working on the feature
+```
+
 ### Option 3: Webhook (Legacy)
 
 HTTP webhook for custom integrations:
@@ -337,12 +378,14 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 **VM environment (add to `~/.bashrc`):**
 
-| Variable               | Description                      | Default  |
-| ---------------------- | -------------------------------- | -------- |
-| `ANTHROPIC_API_KEY`    | Anthropic API key (direct)       | Optional |
-| `ANTHROPIC_BASE_URL`   | API proxy URL (e.g., OpenRouter) | Optional |
-| `ANTHROPIC_AUTH_TOKEN` | Auth token for proxy             | Optional |
-| `OPENAI_API_KEY`       | For voice transcription          | Optional |
+| Variable             | Description                                | Default  |
+| -------------------- | ------------------------------------------ | -------- |
+| `ANTHROPIC_API_KEY`  | API key (Anthropic direct or OpenRouter)   | Optional |
+| `ANTHROPIC_BASE_URL` | API proxy URL (e.g., `https://openrouter.ai/api`) | Optional |
+| `OPENAI_API_KEY`     | For voice transcription                    | Optional |
+
+> **Note**: For OpenRouter/proxy setups, use `ANTHROPIC_API_KEY` with your proxy's key
+> (e.g., `sk-or-v1-...`). Also set `use_api_billing = true` in Takopi's `[claude]` config.
 
 ### Takopi Config (`~/.takopi/takopi.toml`)
 
@@ -358,6 +401,10 @@ session_mode = "chat"
 
 [transports.telegram.topics]
 enabled = true  # Use forum topics for multiple agents
+
+[claude]
+use_api_billing = true            # Required for OpenRouter/proxy setups
+dangerously_skip_permissions = true  # Auto-approve tool calls
 
 [projects.myproject]
 path = "/data/repos/myproject"
@@ -466,15 +513,51 @@ cc-new myagent /data/repos/myproject
 **For Takopi:**
 
 ```bash
-tmux kill-session -t takopi
+# If env vars were added after tmux server started, kill the server first
+tmux kill-server
 tmux new -s takopi -d 'bash -l -c takopi'
 ```
 
+> **Note**: `tmux kill-session` only kills one session. If the tmux server was started
+> before your env vars were set, use `tmux kill-server` to restart fresh.
+
 ### Takopi shows "Invalid API key"
+
+This usually means Takopi isn't passing your API credentials to Claude Code correctly.
+
+**If using OpenRouter or a proxy:**
+
+1. Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`) in `~/.bashrc`:
+
+   ```bash
+   export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
+   export ANTHROPIC_API_KEY="sk-or-v1-..."
+   ```
+
+2. Enable API billing mode in `~/.takopi/takopi.toml`:
+
+   ```toml
+   [claude]
+   use_api_billing = true
+   ```
+
+   By default, Takopi strips `ANTHROPIC_API_KEY` from the environment to prefer
+   subscription billing. Setting `use_api_billing = true` passes your env vars through
+   unchanged.
+
+3. Restart Takopi:
+
+   ```bash
+   tmux kill-session -t takopi
+   tmux new -s takopi -d 'bash -l -c takopi'
+   ```
+
+**General troubleshooting:**
 
 - Ensure Claude Code auth is configured in `~/.bashrc` (see setup step)
 - Restart Takopi with a login shell: `bash -l -c takopi`
-- Verify env vars are set: `echo $ANTHROPIC_API_KEY` (or `$ANTHROPIC_AUTH_TOKEN`)
+- Verify env vars are set: `bash -l -c 'echo $ANTHROPIC_API_KEY'`
+- Check that direct `claude` command works: `bash -l -c claude`
 
 ## License
 

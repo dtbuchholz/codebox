@@ -97,6 +97,15 @@ base_branch = "main"
 # =============================================================================
 
 [claude]
+# Pass ANTHROPIC_API_KEY to Claude (required for OpenRouter/proxy setups).
+# By default, Takopi strips ANTHROPIC_API_KEY to prefer subscription billing.
+# Set to true if you're using your own API key or a proxy like OpenRouter.
+use_api_billing = true
+
+# Auto-approve all tool calls (bash, file edits, etc.) without prompting.
+# Useful for autonomous agent workflows. Use with caution.
+dangerously_skip_permissions = true
+
 # Additional arguments for Claude Code
 # args = "--allowedTools Edit,Read,Write"
 

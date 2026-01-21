@@ -216,6 +216,24 @@ install_takopi() {
     uv tool install -U takopi
 }
 
+install_gh() {
+    if command -v gh &> /dev/null; then
+        echo "gh already installed: $(gh --version | head -1)"
+        return 0
+    fi
+
+    echo "Installing GitHub CLI (gh)..."
+    if [[ "$OS" == "macos" ]]; then
+        brew install gh
+    else
+        # Linux: use official GitHub CLI repo
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt-get update && sudo apt-get install -y gh
+    fi
+}
+
 install_flyctl() {
     if command -v fly &> /dev/null; then
         echo "flyctl already installed: $(fly version)"
@@ -267,6 +285,7 @@ install_pre_commit
 install_node
 install_pnpm
 install_just
+install_gh
 install_takopi
 install_flyctl
 install_docker || true  # Don't fail if Docker install needs manual step
@@ -313,6 +332,7 @@ command -v pre-commit &> /dev/null || MISSING="$MISSING pre-commit"
 command -v node &> /dev/null || MISSING="$MISSING node"
 command -v pnpm &> /dev/null || MISSING="$MISSING pnpm"
 command -v just &> /dev/null || MISSING="$MISSING just"
+command -v gh &> /dev/null || MISSING="$MISSING gh"
 command -v takopi &> /dev/null || MISSING="$MISSING takopi"
 command -v fly &> /dev/null || MISSING="$MISSING flyctl"
 command -v docker &> /dev/null || MISSING="$MISSING docker"
