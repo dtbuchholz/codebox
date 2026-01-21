@@ -64,7 +64,7 @@ git clone https://github.com/your-org/codebox.git
 cd codebox
 
 # Initialize Fly config (creates app + volume interactively)
-./scripts/fly-init.sh agent-box-<yourname>
+make fly-init APP=agent-box-<globally_unique_name>
 
 # Set secrets
 fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
@@ -142,11 +142,13 @@ uv tool install -U takopi
 Configure Claude Code authentication. Choose one:
 
 **Option A: Anthropic API directly**
+
 ```bash
 echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
 ```
 
 **Option B: OpenRouter (or other proxy)**
+
 ```bash
 cat >> ~/.bashrc << 'EOF'
 export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
@@ -156,17 +158,20 @@ EOF
 ```
 
 **Option C: Interactive login**
+
 ```bash
 claude
 # Then use /login when prompted
 ```
 
 Optional: Add OpenAI key for voice transcription:
+
 ```bash
 echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
 ```
 
 After adding to bashrc, reload:
+
 ```bash
 source ~/.bashrc
 ```
@@ -253,7 +258,7 @@ Takopi provides secure, authenticated Telegram integration:
    ```bash
    # Use bash -l to ensure environment variables from ~/.bashrc are loaded
    tmux new -s takopi -d 'bash -l -c takopi'
-   
+
    # View logs
    tmux attach -t takopi
    # Press Ctrl-b d to detach
@@ -299,12 +304,12 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 ### Local (your machine)
 
-| Command                             | Description                              |
-| ----------------------------------- | ---------------------------------------- |
-| `./scripts/fly-init.sh <app-name>`  | Generate fly.toml, create Fly app/volume |
-| `make fly-init APP=<name>`          | Same as above, via Makefile              |
-| `fly deploy`                        | Deploy to Fly.io                         |
-| `fly logs`                          | View Fly.io logs                         |
+| Command                            | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| `./scripts/fly-init.sh <app-name>` | Generate fly.toml, create Fly app/volume |
+| `make fly-init APP=<name>`         | Same as above, via Makefile              |
+| `fly deploy`                       | Deploy to Fly.io                         |
+| `fly logs`                         | View Fly.io logs                         |
 
 ### Remote (on the VM)
 
@@ -324,20 +329,20 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 **Fly.io secrets (set via `fly secrets set`):**
 
-| Variable             | Description             | Default  |
-| -------------------- | ----------------------- | -------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key      | Required |
-| `AUTHORIZED_KEYS`    | SSH public keys         | Required |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token      | Optional |
+| Variable             | Description        | Default  |
+| -------------------- | ------------------ | -------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key | Required |
+| `AUTHORIZED_KEYS`    | SSH public keys    | Required |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token | Optional |
 
 **VM environment (add to `~/.bashrc`):**
 
-| Variable               | Description                          | Default  |
-| ---------------------- | ------------------------------------ | -------- |
-| `ANTHROPIC_API_KEY`    | Anthropic API key (direct)           | Optional |
-| `ANTHROPIC_BASE_URL`   | API proxy URL (e.g., OpenRouter)     | Optional |
-| `ANTHROPIC_AUTH_TOKEN` | Auth token for proxy                 | Optional |
-| `OPENAI_API_KEY`       | For voice transcription              | Optional |
+| Variable               | Description                      | Default  |
+| ---------------------- | -------------------------------- | -------- |
+| `ANTHROPIC_API_KEY`    | Anthropic API key (direct)       | Optional |
+| `ANTHROPIC_BASE_URL`   | API proxy URL (e.g., OpenRouter) | Optional |
+| `ANTHROPIC_AUTH_TOKEN` | Auth token for proxy             | Optional |
+| `OPENAI_API_KEY`       | For voice transcription          | Optional |
 
 ### Takopi Config (`~/.takopi/takopi.toml`)
 
@@ -451,6 +456,7 @@ path = "/data/repos/myproject"
 If you update `~/.bashrc`, existing tmux sessions won't pick up the changes.
 
 **For agents (cc-new):**
+
 ```bash
 cc-stop myagent
 source ~/.bashrc
@@ -458,6 +464,7 @@ cc-new myagent /data/repos/myproject
 ```
 
 **For Takopi:**
+
 ```bash
 tmux kill-session -t takopi
 tmux new -s takopi -d 'bash -l -c takopi'
