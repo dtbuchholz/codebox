@@ -1,4 +1,4 @@
-.PHONY: build deploy logs ssh status clean help setup bootstrap lint format test qa
+.PHONY: build deploy logs ssh status clean help setup bootstrap lint format test qa fly-init
 
 APP_NAME ?= agent-box
 REGION ?= sjc
@@ -13,9 +13,10 @@ help:
 	@echo "Agent Box - Makefile targets"
 	@echo ""
 	@echo "Setup:"
-	@echo "  make bootstrap  Full setup (install tools + hooks) - for fresh machines"
-	@echo "  make setup      Install git hooks (assumes tools exist)"
-	@echo "  make check-tools Check if required tools are installed"
+	@echo "  make fly-init APP=<name>  Generate fly.toml and create Fly app/volume"
+	@echo "  make bootstrap            Full setup (install tools + hooks) - for fresh machines"
+	@echo "  make setup                Install git hooks (assumes tools exist)"
+	@echo "  make check-tools          Check if required tools are installed"
 	@echo ""
 	@echo "Quality:"
 	@echo "  make lint       Run all linters"
@@ -42,6 +43,16 @@ help:
 # =============================================================================
 # Setup
 # =============================================================================
+
+# Initialize Fly.io - generates fly.toml and optionally creates app/volume
+fly-init:
+ifndef APP
+	@echo "Usage: make fly-init APP=<your-app-name> [REGION=sjc]"
+	@echo ""
+	@echo "Example: make fly-init APP=agent-box-dtb"
+	@exit 1
+endif
+	@./scripts/fly-init.sh $(APP) $(REGION)
 
 # Full bootstrap - use this on fresh machines
 bootstrap:

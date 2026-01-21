@@ -3,8 +3,9 @@ set -e
 
 echo "=== Agent Box Starting ==="
 
-# Ensure /data directories exist
+# Ensure /data directories exist with correct ownership
 mkdir -p /data/repos /data/worktrees /data/logs /data/home/agent /data/inbox /data/config
+chown agent:agent /data/repos /data/worktrees /data/logs /data/inbox
 
 # Set up agent home directory on persistent volume
 AGENT_HOME="/data/home/agent"

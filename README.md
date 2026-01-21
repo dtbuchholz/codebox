@@ -60,24 +60,25 @@ You run these steps on your laptop/desktop.
 
 ```bash
 # Clone this repo
+git clone https://github.com/your-org/codebox.git
 cd codebox
 
-# Create the Fly app
-fly apps create agent-box
-
-# Create persistent volume (10GB)
-fly volumes create agent_data --size 10 --region sjc
+# Initialize Fly config (creates app + volume interactively)
+./scripts/fly-init.sh agent-box-<yourname>
 
 # Set secrets
 fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
-fly secrets set AUTHORIZED_KEYS="ssh-ed25519 AAAA... your-key"
+fly secrets set AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)"
 
 # Optional: webhook auth token
-fly secrets set WEBHOOK_AUTH_TOKEN="replace-me"
+fly secrets set WEBHOOK_AUTH_TOKEN="$(openssl rand -hex 16)"
 
 # Deploy
 fly deploy
 ```
+
+> **Note**: The `fly-init.sh` script generates `fly.toml` from `fly.toml.example`.
+> The generated `fly.toml` is gitignored since it contains your personal app name.
 
 After deploy, find your Tailscale IP:
 
@@ -90,8 +91,27 @@ fly ssh console -C "tailscale ip -4"
 You run these steps after SSH-ing into the VM.
 
 ```bash
-ssh -p 2222 agent@<tailscale-ip>
+# Use your app name as the Tailscale hostname (same as fly apps create)
+ssh agent@agent-box-<yourname>
 ```
+
+> **Note**: Tailscale SSH runs on port 22 (default). The `-p 2222` option is only needed
+> for non-Tailscale SSH access, which isn't exposed by default.
+
+Set up SSH keys for cloning private repos:
+
+```bash
+# Generate a deploy key (or copy your existing key)
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub
+# Add this public key to your GitHub repo's deploy keys (Settings → Deploy keys)
+```
+
+Then, either add this public key to your GitHub repo's deploy keys (Settings → Deploy keys), or add it to your personal SSH keys:
+
+1. Go to `github.com/settings/keys`
+2. Click "New SSH key"
+3. Paste the public key from above
 
 Clone your repos into the persistent volume:
 
@@ -110,16 +130,44 @@ vi /data/config/agentbox.toml
 Optional: install Telegram support (Takopi):
 
 ```bash
+# Install uv (adds itself to ~/.bashrc automatically)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
+source ~/.bashrc  # or reconnect
+
+# Install takopi
 uv python install 3.13
 uv tool install -U takopi
 ```
 
-If you want voice note transcription, set your OpenAI API key:
+Configure Claude Code authentication. Choose one:
 
+**Option A: Anthropic API directly**
+```bash
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
+```
+
+**Option B: OpenRouter (or other proxy)**
+```bash
+cat >> ~/.bashrc << 'EOF'
+export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
+export ANTHROPIC_AUTH_TOKEN="sk-or-v1-..."
+export ANTHROPIC_API_KEY=""
+EOF
+```
+
+**Option C: Interactive login**
+```bash
+claude
+# Then use /login when prompted
+```
+
+Optional: Add OpenAI key for voice transcription:
 ```bash
 echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
+```
+
+After adding to bashrc, reload:
+```bash
 source ~/.bashrc
 ```
 
@@ -147,8 +195,9 @@ cc-attach myproject
 
 Just message your bot! Takopi routes messages to Claude Code.
 
-- Use `/project myproject` to set context
-- Use `@branch-name` to work on a specific branch
+- Use `/ctx set myproject` to set project context
+- Use `/ctx set myproject @branch` to set project and branch
+- Use `/claude` to start a Claude session
 - Send voice notes - they're transcribed automatically
 - Send files - they're saved to the project
 
@@ -189,14 +238,40 @@ Takopi provides secure, authenticated Telegram integration:
 
 4. **Get your chat ID**: Send any message to your bot. It will reply with your chat ID. Add this to your config.
 
-5. **Run Takopi**: `takopi` (it will connect to Telegram and start listening)
+   > **Note**: If your Telegram group was upgraded to a supergroup (e.g., when enabling topics),
+   > the chat ID changes. Look for the new ID in the error message and update your config.
+
+5. **Add your projects** to `~/.takopi/takopi.toml`:
+
+   ```toml
+   [projects.myproject]
+   path = "/data/repos/myproject"
+   ```
+
+6. **Run Takopi** in a tmux session (so it persists after disconnect):
+
+   ```bash
+   # Use bash -l to ensure environment variables from ~/.bashrc are loaded
+   tmux new -s takopi -d 'bash -l -c takopi'
+   
+   # View logs
+   tmux attach -t takopi
+   # Press Ctrl-b d to detach
+   ```
+
+> **Note**: If you configured Takopi locally first, copy the config to the VM:
+>
+> ```bash
+> # Tailscale SSH may not support scp directly. Use ssh + cat instead:
+> cat ~/.takopi/takopi.toml | ssh agent@agent-box-<yourname> 'mkdir -p ~/.takopi && cat > ~/.takopi/takopi.toml'
+> ```
 
 ### Option 2: SSH + tmux
 
 Direct terminal access via Tailscale:
 
 ```bash
-ssh -p 2222 agent@<tailscale-ip>
+ssh agent@agent-box-<yourname>
 cc-attach myproject
 ```
 
@@ -222,6 +297,17 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 ## Commands
 
+### Local (your machine)
+
+| Command                             | Description                              |
+| ----------------------------------- | ---------------------------------------- |
+| `./scripts/fly-init.sh <app-name>`  | Generate fly.toml, create Fly app/volume |
+| `make fly-init APP=<name>`          | Same as above, via Makefile              |
+| `fly deploy`                        | Deploy to Fly.io                         |
+| `fly logs`                          | View Fly.io logs                         |
+
+### Remote (on the VM)
+
 | Command                         | Description                     |
 | ------------------------------- | ------------------------------- |
 | `cc-ls`                         | List all running agents         |
@@ -236,12 +322,22 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 ### Environment Variables
 
+**Fly.io secrets (set via `fly secrets set`):**
+
 | Variable             | Description             | Default  |
 | -------------------- | ----------------------- | -------- |
 | `TAILSCALE_AUTHKEY`  | Tailscale auth key      | Required |
 | `AUTHORIZED_KEYS`    | SSH public keys         | Required |
 | `WEBHOOK_AUTH_TOKEN` | Webhook auth token      | Optional |
-| `OPENAI_API_KEY`     | For voice transcription | Optional |
+
+**VM environment (add to `~/.bashrc`):**
+
+| Variable               | Description                          | Default  |
+| ---------------------- | ------------------------------------ | -------- |
+| `ANTHROPIC_API_KEY`    | Anthropic API key (direct)           | Optional |
+| `ANTHROPIC_BASE_URL`   | API proxy URL (e.g., OpenRouter)     | Optional |
+| `ANTHROPIC_AUTH_TOKEN` | Auth token for proxy                 | Optional |
+| `OPENAI_API_KEY`       | For voice transcription              | Optional |
 
 ### Takopi Config (`~/.takopi/takopi.toml`)
 
@@ -306,7 +402,7 @@ path = "/data/repos/myproject"
 ### Via SSH
 
 1. **Tailscale app**: Connect to your tailnet
-2. **SSH app** (Blink/Termius): Save a profile for `agent@<tailscale-ip>:2222`
+2. **SSH app** (Blink/Termius): Save a profile for `agent@agent-box-<yourname>` (port 22)
 3. **On connect**: See MOTD with active agents
 4. **Attach**: `cc-attach <agent-name>`
 5. **Respond to Claude**: Type your response
@@ -327,6 +423,11 @@ path = "/data/repos/myproject"
 - Verify SSH key is set: `fly secrets list`
 - Check logs: `fly logs`
 
+### Fly app name already taken
+
+- App names are global across Fly.io, not just your org.
+- Pick a unique name and re-run: `./scripts/fly-init.sh agent-box-<newname>`
+
 ### Telegram not working
 
 - Verify bot token: message @BotFather, use `/mybots` to check
@@ -344,6 +445,29 @@ path = "/data/repos/myproject"
 - Check tmux: `tmux ls`
 - Check Claude Code: `which claude`
 - View logs: `cat /data/logs/<agent>/`
+
+### Environment variables not working
+
+If you update `~/.bashrc`, existing tmux sessions won't pick up the changes.
+
+**For agents (cc-new):**
+```bash
+cc-stop myagent
+source ~/.bashrc
+cc-new myagent /data/repos/myproject
+```
+
+**For Takopi:**
+```bash
+tmux kill-session -t takopi
+tmux new -s takopi -d 'bash -l -c takopi'
+```
+
+### Takopi shows "Invalid API key"
+
+- Ensure Claude Code auth is configured in `~/.bashrc` (see setup step)
+- Restart Takopi with a login shell: `bash -l -c takopi`
+- Verify env vars are set: `echo $ANTHROPIC_API_KEY` (or `$ANTHROPIC_AUTH_TOKEN`)
 
 ## License
 

@@ -1,5 +1,6 @@
 # Fly.io
 .fly/
+fly.toml
 
 # Go
 webhook/webhook-receiver
