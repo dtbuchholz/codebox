@@ -43,9 +43,6 @@ session_mode = "chat"
 # Show resume footer in messages
 show_resume_line = true
 
-# When to respond: "all" or "mentions" (only @mentions, commands, replies)
-trigger_mode = "all"
-
 # -----------------------------------------------------------------------------
 # Voice Notes
 # -----------------------------------------------------------------------------
