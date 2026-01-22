@@ -110,10 +110,28 @@ if [ -d "/opt/hooks" ]; then
 fi
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
+# Export API keys to agent's environment (from Fly secrets)
+AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
+{
+    [ -n "$ANTHROPIC_API_KEY" ] && echo "export ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\""
+    [ -n "$ANTHROPIC_BASE_URL" ] && echo "export ANTHROPIC_BASE_URL=\"$ANTHROPIC_BASE_URL\""
+    [ -n "$OPENAI_API_KEY" ] && echo "export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
+} > "$AGENT_ENV_FILE"
+chown agent:agent "$AGENT_ENV_FILE"
+chmod 600 "$AGENT_ENV_FILE"
+
+# Add source to bashrc if not already there
+if ! grep -q ".env.secrets" "$AGENT_HOME/.bashrc" 2>/dev/null; then
+    echo '[ -f ~/.env.secrets ] && source ~/.env.secrets' >> "$AGENT_HOME/.bashrc"
+fi
+
 # Auto-start Takopi if configured
 if [ -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
     echo "Starting Takopi (Telegram bot)..."
     if command -v takopi &> /dev/null || [ -x "$AGENT_HOME/.local/bin/takopi" ]; then
+        # Kill any existing tmux server to ensure fresh environment with new secrets
+        su - agent -c "tmux kill-server 2>/dev/null || true"
+        sleep 1
         su - agent -c "tmux new-session -d -s takopi 'bash -l -c takopi'" 2>/dev/null && \
             echo "Takopi started in tmux session 'takopi'" || \
             echo "Warning: Failed to start Takopi"

@@ -141,6 +141,9 @@ start_takopi() {
     fi
 
     log "Starting Takopi..."
+    # Kill tmux server first to ensure fresh environment with current secrets
+    su - agent -c "tmux kill-server 2>/dev/null || true"
+    sleep 1
     su - agent -c "tmux new-session -d -s takopi 'bash -l -c takopi'" 2>/dev/null
 
     # Wait a moment and verify it started

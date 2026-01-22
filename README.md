@@ -148,15 +148,28 @@ uv tool install -U takopi
 
 Configure Claude Code authentication. Choose one:
 
-**Option A: Anthropic API directly**
+**Option A: Fly secrets (recommended - persists across restarts)**
 
 ```bash
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
+# From your local machine:
+fly secrets set ANTHROPIC_API_KEY="sk-ant-..."
+
+# For OpenRouter/proxy:
+fly secrets set ANTHROPIC_API_KEY="sk-or-v1-..." ANTHROPIC_BASE_URL="https://openrouter.ai/api"
+
+# For voice transcription:
+fly secrets set OPENAI_API_KEY="sk-..."
 ```
 
-**Option B: OpenRouter (or other proxy)**
+The entrypoint automatically exports these to the agent user's environment.
+
+**Option B: bashrc (simpler, but may not survive all restarts)**
 
 ```bash
+# On the VM:
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
+
+# For OpenRouter:
 cat >> ~/.bashrc << 'EOF'
 export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
 export ANTHROPIC_API_KEY="sk-or-v1-..."
@@ -164,7 +177,6 @@ EOF
 ```
 
 > **Note**: Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`) with OpenRouter.
-> Claude Code and Takopi both expect this variable name.
 
 **Option C: Interactive login**
 
@@ -393,6 +405,7 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 ### Takopi Config (`~/.takopi/takopi.toml`)
 
 ```toml
+watch_config = true  # Hot-reload config changes (no restart needed for new projects)
 default_engine = "claude"
 transport = "telegram"
 
@@ -594,12 +607,15 @@ This usually means Takopi isn't passing your API credentials to Claude Code corr
    subscription billing. Setting `use_api_billing = true` passes your env vars through
    unchanged.
 
-3. Restart Takopi:
+3. Restart Takopi (use `kill-server`, not `kill-session`):
 
    ```bash
-   tmux kill-session -t takopi
+   tmux kill-server
    tmux new -s takopi -d 'bash -l -c takopi'
    ```
+
+   > **Important**: `tmux kill-server` ensures the new session gets fresh environment
+   > variables. `kill-session` alone may leave a stale tmux server with old env vars.
 
 **General troubleshooting:**
 
