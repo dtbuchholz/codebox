@@ -22,8 +22,6 @@ primary_region = "{{REGION}}"
 [env]
   # Used as Tailscale hostname
   FLY_APP_NAME = "{{APP_NAME}}"
-  # Default ntfy topic (override with secrets)
-  NTFY_TOPIC = "{{APP_NAME}}-notifications"
 
 # Mount persistent volume
 [mounts]
@@ -34,7 +32,7 @@ primary_region = "{{REGION}}"
 # Machine configuration
 [[vm]]
   size = "shared-cpu-2x"
-  memory = "2gb"
+  memory = "4gb"
 
 # Process configuration
 [processes]

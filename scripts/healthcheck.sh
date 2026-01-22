@@ -1,10 +1,11 @@
 #!/bin/bash
-# healthcheck.sh - Monitor Agent Box services and notify on issues
+# healthcheck.sh - Monitor Agent Box services and auto-restart Takopi
 #
 # Checks:
-#   - Takopi running (if configured)
+#   - Takopi running (if configured) - auto-restarts if down
 #   - Tailscale connected
 #   - SSH daemon running
+#   - Memory usage
 #
 # Usage:
 #   healthcheck.sh          # Run once
@@ -14,58 +15,9 @@ set -e
 
 AGENT_HOME="${AGENT_HOME:-/data/home/agent}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-60}"
-NOTIFY_COOLDOWN="${NOTIFY_COOLDOWN:-300}"  # Don't spam notifications
-
-# Track last notification time per service
-NOTIFY_STATE_DIR="/tmp/healthcheck-state"
-mkdir -p "$NOTIFY_STATE_DIR"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
-}
-
-should_notify() {
-    local service="$1"
-    local state_file="$NOTIFY_STATE_DIR/$service.last_notify"
-    local now
-    now=$(date +%s)
-
-    if [ ! -f "$state_file" ]; then
-        echo "$now" > "$state_file"
-        return 0
-    fi
-
-    local last_notify
-    last_notify=$(cat "$state_file")
-    local elapsed=$((now - last_notify))
-
-    if [ "$elapsed" -ge "$NOTIFY_COOLDOWN" ]; then
-        echo "$now" > "$state_file"
-        return 0
-    fi
-
-    return 1
-}
-
-clear_notify_state() {
-    local service="$1"
-    rm -f "$NOTIFY_STATE_DIR/$service.last_notify"
-}
-
-notify_if_enabled() {
-    local service="$1"
-    local title="$2"
-    local message="$3"
-    local priority="${4:-high}"
-
-    if ! should_notify "$service"; then
-        log "Skipping notification for $service (cooldown)"
-        return
-    fi
-
-    if command -v notify.sh &> /dev/null; then
-        notify.sh -t "$title" -p "$priority" --tags "warning" "$message" || true
-    fi
 }
 
 check_takopi() {
@@ -80,19 +32,15 @@ check_takopi() {
     # Check if takopi tmux session exists
     if su - agent -c "tmux has-session -t takopi 2>/dev/null"; then
         log "Takopi: running"
-        clear_notify_state "takopi"
         return 0
     else
-        log "Takopi: NOT RUNNING"
-        notify_if_enabled "takopi" "Takopi Down" "Takopi is not running. Attempting restart..."
+        log "Takopi: NOT RUNNING - attempting restart..."
 
         # Attempt restart
         if start_takopi; then
             log "Takopi: restarted successfully"
-            notify_if_enabled "takopi-recovered" "Takopi Recovered" "Takopi has been restarted successfully" "default"
         else
             log "Takopi: restart failed"
-            notify_if_enabled "takopi" "Takopi Restart Failed" "Failed to restart Takopi. Manual intervention required."
         fi
         return 1
     fi
@@ -103,11 +51,9 @@ check_tailscale() {
         local ip
         ip=$(tailscale ip -4 2>/dev/null || echo "unknown")
         log "Tailscale: connected ($ip)"
-        clear_notify_state "tailscale"
         return 0
     else
         log "Tailscale: NOT CONNECTED"
-        notify_if_enabled "tailscale" "Tailscale Down" "Tailscale is not connected. SSH access may be unavailable."
         return 1
     fi
 }
@@ -115,11 +61,9 @@ check_tailscale() {
 check_sshd() {
     if pgrep -x sshd > /dev/null; then
         log "SSH: running"
-        clear_notify_state "sshd"
         return 0
     else
         log "SSH: NOT RUNNING"
-        notify_if_enabled "sshd" "SSH Down" "SSH daemon is not running."
         return 1
     fi
 }
@@ -138,7 +82,6 @@ check_memory() {
     free_mb=$(free -m | awk '/^Mem:/ {print $4}')
     if [ "$free_mb" -lt 200 ]; then
         log "WARNING: Low memory detected (${free_mb}MB free)"
-        notify_if_enabled "memory" "Low Memory" "Agent Box has only ${free_mb}MB free memory. Consider scaling up." "high"
         return 1
     fi
     return 0

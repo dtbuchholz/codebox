@@ -59,7 +59,7 @@ if [ -n "$MISSING_SECRETS" ]; then
     echo "  fly secrets set AUTHORIZED_KEYS='ssh-ed25519 AAAA...' -a $APP_NAME"
     echo ""
     echo "Optional secrets:"
-    echo "  fly secrets set NTFY_TOPIC='your-unique-topic' -a $APP_NAME"
+    echo "  fly secrets set ANTHROPIC_API_KEY='sk-...' -a $APP_NAME"
     echo "  fly secrets set WEBHOOK_AUTH_TOKEN='your-secret' -a $APP_NAME"
     echo ""
     read -p "Continue anyway? (y/N) " -n 1 -r

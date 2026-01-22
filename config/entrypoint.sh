@@ -155,12 +155,8 @@ if ! command -v claude &> /dev/null; then
     npm install -g @anthropic-ai/claude-code || echo "Claude Code install will complete on first run"
 fi
 
-# Set up Claude Code hooks directory
-CLAUDE_HOOKS_DIR="$AGENT_HOME/.claude/hooks"
-mkdir -p "$CLAUDE_HOOKS_DIR"
-if [ -d "/opt/hooks" ]; then
-    cp /opt/hooks/* "$CLAUDE_HOOKS_DIR/" 2>/dev/null || true
-fi
+# Ensure Claude Code config directory exists
+mkdir -p "$AGENT_HOME/.claude"
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
 # Export API keys to agent's environment (from Fly secrets)
@@ -208,13 +204,6 @@ echo "SSH: port 2222"
 echo "Webhook: port 8080"
 echo "Tailscale: $(tailscale ip -4 2>/dev/null || echo 'pending auth')"
 echo "Takopi: $(su - agent -c 'tmux has-session -t takopi 2>/dev/null' && echo 'running' || echo 'not running')"
-
-# Send startup notification if configured
-if [ -f "/data/config/notify.conf" ]; then
-    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo 'pending')
-    /usr/local/bin/notify.sh -t "Agent Box Started" --tags "rocket" \
-        "Agent Box is ready. Tailscale IP: $TAILSCALE_IP" 2>/dev/null || true
-fi
 
 # Keep container running (wait for any child process)
 # shellcheck disable=SC2086

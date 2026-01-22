@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
     procps \
     locales \
     postgresql \
+    man-db \
+    less \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale
@@ -57,6 +60,15 @@ RUN curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg | t
     && apt-get install -y tailscale \
     && rm -rf /var/lib/apt/lists/*
 
+# Install yazi (terminal file manager)
+RUN YAZI_VERSION=$(curl -sL https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r .tag_name) \
+    && curl -fsSL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VERSION}/yazi-x86_64-unknown-linux-gnu.zip" -o /tmp/yazi.zip \
+    && unzip /tmp/yazi.zip -d /tmp/yazi \
+    && mv /tmp/yazi/yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/ \
+    && mv /tmp/yazi/yazi-x86_64-unknown-linux-gnu/ya /usr/local/bin/ \
+    && chmod +x /usr/local/bin/yazi /usr/local/bin/ya \
+    && rm -rf /tmp/yazi /tmp/yazi.zip
+
 # Create agent user (non-root for security)
 RUN useradd -m -s /bin/bash -G sudo agent \
     && echo "agent ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -76,18 +88,13 @@ COPY --from=webhook-builder /build/webhook-receiver /usr/local/bin/
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/notify.sh /usr/local/bin/healthcheck.sh /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh 2>/dev/null || true \
+RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/healthcheck.sh /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh 2>/dev/null || true \
     && ln -sf /usr/local/bin/vm-setup.sh /usr/local/bin/vm-setup
-
-# Copy hooks
-COPY hooks/ /opt/hooks/
-RUN chmod +x /opt/hooks/*.sh 2>/dev/null || true
 
 # Copy config files
 COPY config/entrypoint.sh /entrypoint.sh
 COPY config/claude-settings.json /opt/claude-settings.json
 RUN mkdir -p /opt/config
-COPY config/notify.conf.example /opt/notify.conf.example
 COPY config/agentbox.toml.example /opt/config/agentbox.toml.example
 COPY config/takopi.toml.example /opt/config/takopi.toml.example
 RUN chmod +x /entrypoint.sh

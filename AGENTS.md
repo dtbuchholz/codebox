@@ -4,7 +4,7 @@ Configuration for AI assistants working on this codebase.
 
 ## Project Overview
 
-**Agent Box** - Remote Claude Code environment on Fly.io with tmux sessions, Tailscale access, and push notifications. Run long-lived AI coding agents in the cloud, reconnect from anywhere (including iOS), and get notified when they need input.
+**Agent Box** - Remote Claude Code environment on Fly.io with tmux sessions, Tailscale access, and Telegram integration. Run long-lived AI coding agents in the cloud, reconnect from anywhere (including iOS), and interact via Telegram with Takopi.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ Configuration for AI assistants working on this codebase.
 - **Docker**: Multi-stage build for Fly.io deployment
 - **Fly.io**: Cloud platform with persistent volumes
 - **Tailscale**: Private network access (no public SSH)
-- **ntfy**: Push notifications
+- **Takopi**: Telegram bot for Claude interaction
 - **just**: Task runner (alternative to Make)
 - **Prettier**: Formatting for MD/JSON/YAML
 
@@ -56,15 +56,13 @@ codebox/
 │   ├── cc-ls             # List running agents
 │   ├── cc-attach         # Attach to agent session
 │   ├── config.sh         # TOML config utilities
-│   ├── notify.sh         # Send ntfy push notification
+│   ├── healthcheck.sh    # Service monitoring and auto-restart
+│   ├── vm-setup.sh       # Interactive VM setup wizard
 │   └── bootstrap.sh      # Fresh VM setup script
-├── hooks/                # Claude Code notification hooks
-│   ├── notification-hook.sh  # General notifications → push
-│   └── prompt-hook.sh        # Input needed → push
 ├── config/               # Container configuration
 │   ├── entrypoint.sh     # Container startup (tailscale, sshd, webhook)
 │   ├── agentbox.toml.example # Agent box configuration template
-│   └── notify.conf.example   # Notification settings template
+│   └── takopi.toml.example   # Takopi (Telegram bot) template
 ├── justfile              # Task runner (alternative to Makefile)
 ├── Makefile              # Build/deploy commands
 ├── Dockerfile            # Multi-stage build
@@ -155,7 +153,6 @@ make dev-build && make dev-run  # Local testing
 │   └── .ssh/             # SSH authorized_keys
 └── config/
     ├── authorized_keys   # SSH keys (alternative location)
-    ├── notify.conf       # Notification settings
     ├── tailscale.state   # Tailscale state
     └── ssh_host_*        # SSH host keys
 ```

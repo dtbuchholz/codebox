@@ -31,27 +31,6 @@ base_branch = "main"
 auto_create = true
 
 # =============================================================================
-# Notification Settings
-# =============================================================================
-[notifications]
-# Enable push notifications
-enabled = true
-
-# ntfy server URL
-server = "https://ntfy.sh"
-
-# ntfy topic (make this unique and hard to guess)
-topic = "agent-box-CHANGEME"
-
-# Default priority: min, low, default, high, urgent
-priority = "default"
-
-# Notify on these events
-notify_on_prompt = true      # Agent waiting for input
-notify_on_error = true       # Agent encountered error
-notify_on_complete = false   # Agent completed task
-
-# =============================================================================
 # Webhook Settings
 # =============================================================================
 [webhook]
