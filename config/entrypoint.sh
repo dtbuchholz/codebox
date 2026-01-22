@@ -3,6 +3,19 @@ set -e
 
 echo "=== Agent Box Starting ==="
 
+# Set up swap space to handle memory spikes (Claude Code can be memory-hungry)
+SWAP_FILE="/data/swapfile"
+SWAP_SIZE="${SWAP_SIZE_MB:-2048}"  # 2GB swap by default
+if [ ! -f "$SWAP_FILE" ]; then
+    echo "Creating ${SWAP_SIZE}MB swap file..."
+    dd if=/dev/zero of="$SWAP_FILE" bs=1M count="$SWAP_SIZE" 2>/dev/null
+    chmod 600 "$SWAP_FILE"
+    mkswap "$SWAP_FILE" >/dev/null
+fi
+if ! swapon -s | grep -q "$SWAP_FILE"; then
+    swapon "$SWAP_FILE" 2>/dev/null || echo "Warning: Could not enable swap"
+fi
+
 # Ensure /data directories exist with correct ownership
 mkdir -p /data/repos /data/worktrees /data/logs /data/home/agent /data/inbox /data/config
 chown agent:agent /data/repos /data/worktrees /data/logs /data/inbox
@@ -132,7 +145,8 @@ if [ -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
         # Kill any existing tmux server to ensure fresh environment with new secrets
         su - agent -c "tmux kill-server 2>/dev/null || true"
         sleep 1
-        su - agent -c "tmux new-session -d -s takopi 'bash -l -c takopi'" 2>/dev/null && \
+        # Explicitly source env.secrets to ensure API keys are available
+        su - agent -c "tmux new-session -d -s takopi 'source ~/.env.secrets 2>/dev/null; bash -l -c takopi'" 2>/dev/null && \
             echo "Takopi started in tmux session 'takopi'" || \
             echo "Warning: Failed to start Takopi"
     else

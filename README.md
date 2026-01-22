@@ -521,6 +521,7 @@ ENABLE_HEALTHCHECK=0
 | Takopi | tmux session exists | Yes - restarts automatically |
 | Tailscale | `tailscale status` | No - notifies only |
 | SSH | `pgrep sshd` | No - notifies only |
+| Memory | `free -m` (warns < 200MB) | No - notifies only |
 
 ## Security
 
@@ -623,6 +624,44 @@ This usually means Takopi isn't passing your API credentials to Claude Code corr
 - Restart Takopi with a login shell: `bash -l -c takopi`
 - Verify env vars are set: `bash -l -c 'echo $ANTHROPIC_API_KEY'`
 - Check that direct `claude` command works: `bash -l -c claude`
+
+### VM freezes or becomes unresponsive
+
+If the VM freezes during heavy Claude operations (parallel file searches, large repos):
+
+**Symptoms:**
+- SSH hangs or times out
+- Telegram bot stops responding
+- `fly ssh console` hangs
+
+**Immediate fix:**
+```bash
+fly machines list                    # Get machine ID
+fly machines restart <machine-id>    # Restart the machine
+```
+
+**Root cause:** Usually out-of-memory (OOM). Claude Code can spike memory usage during
+parallel operations (multiple globs, greps, reads at once).
+
+**Prevention:**
+
+1. **Increase memory** (recommended for active use):
+   ```bash
+   fly scale memory 4096   # 4GB instead of 2GB
+   ```
+
+2. **Swap is auto-configured** - The entrypoint creates a 2GB swap file on `/data` to
+   handle spikes. Adjust with `SWAP_SIZE_MB` env var if needed.
+
+3. **Monitor memory** - Health check logs memory usage every 60s:
+   ```bash
+   tail -f /data/logs/healthcheck.log
+   ```
+
+4. **Check for OOM kills** (after restart):
+   ```bash
+   dmesg | grep -i "out of memory"
+   ```
 
 ## License
 

@@ -124,6 +124,26 @@ check_sshd() {
     fi
 }
 
+check_memory() {
+    # Log memory stats and warn if low
+    local mem_info
+    mem_info=$(free -m | awk '/^Mem:/ {printf "used=%dMB free=%dMB total=%dMB (%.0f%% used)", $3, $4, $2, $3/$2*100}')
+    local swap_info
+    swap_info=$(free -m | awk '/^Swap:/ {if($2>0) printf "swap=%dMB/%dMB", $3, $2; else print "swap=none"}')
+
+    log "Memory: $mem_info $swap_info"
+
+    # Warn if less than 200MB free
+    local free_mb
+    free_mb=$(free -m | awk '/^Mem:/ {print $4}')
+    if [ "$free_mb" -lt 200 ]; then
+        log "WARNING: Low memory detected (${free_mb}MB free)"
+        notify_if_enabled "memory" "Low Memory" "Agent Box has only ${free_mb}MB free memory. Consider scaling up." "high"
+        return 1
+    fi
+    return 0
+}
+
 start_takopi() {
     local takopi_config="$AGENT_HOME/.takopi/takopi.toml"
 
@@ -144,7 +164,8 @@ start_takopi() {
     # Kill tmux server first to ensure fresh environment with current secrets
     su - agent -c "tmux kill-server 2>/dev/null || true"
     sleep 1
-    su - agent -c "tmux new-session -d -s takopi 'bash -l -c takopi'" 2>/dev/null
+    # Explicitly source env.secrets to ensure API keys are available
+    su - agent -c "tmux new-session -d -s takopi 'source ~/.env.secrets 2>/dev/null; bash -l -c takopi'" 2>/dev/null
 
     # Wait a moment and verify it started
     sleep 2
@@ -161,6 +182,7 @@ run_checks() {
     check_tailscale || ((failed++))
     check_sshd || ((failed++))
     check_takopi || ((failed++))
+    check_memory || true  # Don't count memory warning as failure
 
     return $failed
 }
