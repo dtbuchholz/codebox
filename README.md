@@ -127,6 +127,13 @@ gh auth login
 # Follow prompts - choose HTTPS and authenticate via browser or token
 ```
 
+Configure git identity (required for commits):
+
+```bash
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
+```
+
 Optional: configure project aliases and defaults:
 
 ```bash
