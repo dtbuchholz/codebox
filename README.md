@@ -9,6 +9,7 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 - **Telegram integration**: Chat with agents via [Takopi](https://takopi.dev) - text, voice, files
 - **Phone-first access**: Connect via Tailscale + SSH from iOS (Blink, Termius)
 - **Git worktrees**: Each agent can work on its own branch without conflicts
+- **Dev tools included**: PostgreSQL, pnpm, gh CLI, and more pre-installed
 
 ## Architecture
 
@@ -97,6 +98,16 @@ ssh agent@agent-box-<yourname>
 
 > **Note**: Tailscale SSH runs on port 22 (default). The `-p 2222` option is only needed
 > for non-Tailscale SSH access, which isn't exposed by default.
+
+**Quick setup (recommended)**: Run the interactive setup wizard:
+
+```bash
+vm-setup
+```
+
+This guides you through configuring git, GitHub CLI, SSH keys, and Takopi.
+
+**Or configure manually** (see below).
 
 Set up SSH keys for cloning private repos:
 
@@ -376,15 +387,17 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 
 ### Remote (on the VM)
 
-| Command                         | Description                     |
-| ------------------------------- | ------------------------------- |
-| `cc-ls`                         | List all running agents         |
-| `cc-new <name> <dir>`           | Create a new agent in directory |
-| `cc-new <name> @project/branch` | Create agent with git worktree  |
-| `cc-attach <name>`              | Attach to an existing agent     |
-| `cc-stop <name>`                | Stop an agent                   |
-| `cc-stop --all`                 | Stop all agents                 |
-| `takopi`                        | Run Takopi (Telegram interface) |
+| Command                         | Description                      |
+| ------------------------------- | -------------------------------- |
+| `vm-setup`                      | Interactive setup wizard         |
+| `cc-ls`                         | List all running agents          |
+| `cc-new <name> <dir>`           | Create a new agent in directory  |
+| `cc-new <name> @project/branch` | Create agent with git worktree   |
+| `cc-attach <name>`              | Attach to an existing agent      |
+| `cc-stop <name>`                | Stop an agent                    |
+| `cc-stop --all`                 | Stop all agents                  |
+| `takopi`                        | Run Takopi (Telegram interface)  |
+| `psql -U postgres`              | Connect to local PostgreSQL      |
 
 ## Configuration
 
@@ -455,6 +468,7 @@ path = "/data/repos/myproject"
 /data/
 ├── repos/              # Clone your repositories here
 ├── worktrees/          # Git worktrees (one per agent/branch)
+├── postgresql/         # PostgreSQL data (persistent)
 ├── logs/
 │   ├── <agent>/        # Logs per agent
 │   └── healthcheck.log # Health monitor logs
@@ -468,6 +482,20 @@ path = "/data/repos/myproject"
     ├── tailscale.state # Tailscale state
     └── ssh_host_*      # SSH host keys
 ```
+
+## Pre-installed Tools
+
+The VM includes common development tools:
+
+| Tool | Description |
+| ---- | ----------- |
+| `claude` | Claude Code CLI |
+| `gh` | GitHub CLI for issues, PRs, etc. |
+| `git` | Version control |
+| `psql` | PostgreSQL client (server auto-starts) |
+| `pnpm` | Fast Node.js package manager |
+| `node` | Node.js 22.x LTS |
+| `vim`, `htop`, `jq` | Common utilities |
 
 ## iOS Workflow
 

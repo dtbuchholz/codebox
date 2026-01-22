@@ -1,0 +1,274 @@
+#!/bin/bash
+# vm-setup.sh - Interactive setup wizard for Agent Box VM
+#
+# Run this after first SSH into the VM to configure essentials.
+# Usage: vm-setup
+
+set -e
+
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+print_header() {
+    echo ""
+    echo -e "${BOLD}=== $1 ===${NC}"
+    echo ""
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}!${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+ask_yes_no() {
+    local prompt="$1"
+    local default="${2:-y}"
+    local response
+
+    if [ "$default" = "y" ]; then
+        read -p "$prompt [Y/n]: " response
+        response="${response:-y}"
+    else
+        read -p "$prompt [y/N]: " response
+        response="${response:-n}"
+    fi
+
+    [[ "$response" =~ ^[Yy] ]]
+}
+
+# ============================================================================
+# Welcome
+# ============================================================================
+clear
+echo -e "${BOLD}"
+cat << 'EOF'
+     _                    _     ____
+    / \   __ _  ___ _ __ | |_  | __ )  _____  __
+   / _ \ / _` |/ _ \ '_ \| __| |  _ \ / _ \ \/ /
+  / ___ \ (_| |  __/ | | | |_  | |_) | (_) >  <
+ /_/   \_\__, |\___|_| |_|\__| |____/ \___/_/\_\
+         |___/
+EOF
+echo -e "${NC}"
+echo "Welcome to Agent Box setup!"
+echo "This wizard will help you configure the essentials."
+echo ""
+echo "Press Enter to continue..."
+read -r
+
+# ============================================================================
+# Check what's already configured
+# ============================================================================
+print_header "Checking current configuration"
+
+# Git config
+GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
+GIT_NAME=$(git config --global user.name 2>/dev/null || echo "")
+
+if [ -n "$GIT_EMAIL" ] && [ -n "$GIT_NAME" ]; then
+    print_success "Git identity: $GIT_NAME <$GIT_EMAIL>"
+    NEED_GIT=false
+else
+    print_warning "Git identity not configured"
+    NEED_GIT=true
+fi
+
+# GitHub CLI
+if gh auth status &>/dev/null; then
+    GH_USER=$(gh api user --jq .login 2>/dev/null || echo "authenticated")
+    print_success "GitHub CLI: logged in as $GH_USER"
+    NEED_GH=false
+else
+    print_warning "GitHub CLI not authenticated"
+    NEED_GH=true
+fi
+
+# SSH key
+if [ -f ~/.ssh/id_ed25519.pub ]; then
+    print_success "SSH key exists: ~/.ssh/id_ed25519.pub"
+    NEED_SSH=false
+else
+    print_warning "No SSH key found"
+    NEED_SSH=true
+fi
+
+# Takopi
+if [ -f ~/.takopi/takopi.toml ]; then
+    print_success "Takopi config exists"
+    NEED_TAKOPI=false
+else
+    print_warning "Takopi not configured"
+    NEED_TAKOPI=true
+fi
+
+# Claude Code
+if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.env.secrets ]; then
+    print_success "Claude API key configured"
+    NEED_CLAUDE=false
+else
+    print_warning "Claude API key not set"
+    NEED_CLAUDE=true
+fi
+
+echo ""
+
+# ============================================================================
+# Git Identity
+# ============================================================================
+if [ "$NEED_GIT" = true ]; then
+    print_header "Git Identity"
+    echo "Git needs your name and email for commits."
+    echo ""
+
+    read -p "Your name: " git_name
+    read -p "Your email: " git_email
+
+    if [ -n "$git_name" ] && [ -n "$git_email" ]; then
+        git config --global user.name "$git_name"
+        git config --global user.email "$git_email"
+        print_success "Git identity configured"
+    else
+        print_warning "Skipped - you'll need to configure this manually"
+    fi
+fi
+
+# ============================================================================
+# SSH Key
+# ============================================================================
+if [ "$NEED_SSH" = true ]; then
+    print_header "SSH Key"
+    echo "An SSH key is needed for cloning private repos."
+    echo ""
+
+    if ask_yes_no "Generate a new SSH key?"; then
+        ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -q
+        print_success "SSH key generated"
+        echo ""
+        echo "Add this public key to GitHub (https://github.com/settings/keys):"
+        echo ""
+        cat ~/.ssh/id_ed25519.pub
+        echo ""
+        echo "Press Enter after adding the key to GitHub..."
+        read -r
+    else
+        print_warning "Skipped - add your own key to ~/.ssh/"
+    fi
+fi
+
+# ============================================================================
+# GitHub CLI
+# ============================================================================
+if [ "$NEED_GH" = true ]; then
+    print_header "GitHub CLI"
+    echo "The GitHub CLI (gh) lets Claude create issues, PRs, etc."
+    echo ""
+
+    if ask_yes_no "Authenticate with GitHub now?"; then
+        echo ""
+        echo "Choose 'GitHub.com', 'HTTPS', and 'Login with a web browser' or 'Paste token'"
+        echo ""
+        gh auth login
+        print_success "GitHub CLI authenticated"
+    else
+        print_warning "Skipped - run 'gh auth login' later"
+    fi
+fi
+
+# ============================================================================
+# Takopi (Telegram)
+# ============================================================================
+if [ "$NEED_TAKOPI" = true ]; then
+    print_header "Takopi (Telegram Bot)"
+    echo "Takopi lets you chat with Claude via Telegram."
+    echo ""
+
+    if ask_yes_no "Set up Telegram integration?" "n"; then
+        echo ""
+        echo "First, create a bot:"
+        echo "  1. Message @BotFather on Telegram"
+        echo "  2. Send /newbot and follow prompts"
+        echo "  3. Copy the bot token"
+        echo ""
+
+        # Check if uv/takopi is installed
+        if ! command -v takopi &>/dev/null; then
+            if ask_yes_no "Takopi not installed. Install it now?"; then
+                if ! command -v uv &>/dev/null; then
+                    echo "Installing uv..."
+                    curl -LsSf https://astral.sh/uv/install.sh | sh
+                    source ~/.bashrc
+                fi
+                uv python install 3.13
+                uv tool install -U takopi
+                print_success "Takopi installed"
+            fi
+        fi
+
+        if command -v takopi &>/dev/null; then
+            echo ""
+            echo "Running Takopi setup wizard..."
+            takopi
+        else
+            print_warning "Install takopi manually: uv tool install takopi"
+        fi
+    else
+        print_warning "Skipped - run 'takopi' later to set up Telegram"
+    fi
+fi
+
+# ============================================================================
+# Summary
+# ============================================================================
+print_header "Setup Complete!"
+
+echo "Current status:"
+echo ""
+
+# Re-check status
+GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
+if [ -n "$GIT_EMAIL" ]; then
+    print_success "Git: $(git config --global user.name) <$GIT_EMAIL>"
+else
+    print_error "Git: not configured - run: git config --global user.email/name"
+fi
+
+if gh auth status &>/dev/null; then
+    print_success "GitHub CLI: authenticated"
+else
+    print_error "GitHub CLI: not authenticated - run: gh auth login"
+fi
+
+if [ -f ~/.ssh/id_ed25519.pub ]; then
+    print_success "SSH key: exists"
+else
+    print_error "SSH key: missing - run: ssh-keygen -t ed25519"
+fi
+
+if [ -f ~/.takopi/takopi.toml ]; then
+    print_success "Takopi: configured"
+else
+    print_warning "Takopi: not configured (optional) - run: takopi"
+fi
+
+if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.env.secrets ]; then
+    print_success "Claude API: configured"
+else
+    print_warning "Claude API: set via 'fly secrets set ANTHROPIC_API_KEY=...' from local machine"
+fi
+
+echo ""
+echo "Next steps:"
+echo "  1. Clone repos: cd /data/repos && git clone <repo-url>"
+echo "  2. Start an agent: cc-new myproject /data/repos/myproject"
+echo "  3. Or use Telegram: /claude <your message>"
+echo ""
