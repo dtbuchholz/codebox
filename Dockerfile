@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
     htop \
     procps \
     locales \
-    postgresql-client \
+    postgresql \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale

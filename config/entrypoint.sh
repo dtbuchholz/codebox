@@ -97,6 +97,46 @@ else
     chmod 644 /etc/ssh/ssh_host_*_key.pub
 fi
 
+# Start PostgreSQL if installed (wrapped to not fail entrypoint)
+start_postgresql() {
+    if ! command -v pg_ctlcluster &> /dev/null; then
+        return 0
+    fi
+
+    echo "Starting PostgreSQL..."
+    PG_VERSION=$(ls /etc/postgresql/ 2>/dev/null | head -1)
+    if [ -z "$PG_VERSION" ]; then
+        echo "Warning: PostgreSQL installed but no version found"
+        return 0
+    fi
+
+    PG_DATA="/data/postgresql/$PG_VERSION"
+    PG_CONF="/etc/postgresql/$PG_VERSION/main"
+
+    if [ ! -d "$PG_DATA" ]; then
+        echo "Initializing PostgreSQL data directory..."
+        mkdir -p "$PG_DATA"
+        chown postgres:postgres "$PG_DATA"
+        chmod 700 "$PG_DATA"
+        su - postgres -c "/usr/lib/postgresql/$PG_VERSION/bin/initdb -D $PG_DATA" || return 0
+    fi
+
+    # Configure to use persistent data and allow local trust auth
+    if [ -d "$PG_DATA" ]; then
+        # Update data_directory in postgresql.conf
+        sed -i "s|^data_directory.*|data_directory = '$PG_DATA'|g" "$PG_CONF/postgresql.conf" 2>/dev/null || true
+
+        # Allow trust auth for local connections (dev environment)
+        if [ -f "$PG_CONF/pg_hba.conf" ]; then
+            sed -i 's/peer$/trust/g' "$PG_CONF/pg_hba.conf" 2>/dev/null || true
+            sed -i 's/scram-sha-256$/trust/g' "$PG_CONF/pg_hba.conf" 2>/dev/null || true
+        fi
+
+        pg_ctlcluster "$PG_VERSION" main start 2>/dev/null || echo "Warning: PostgreSQL failed to start"
+    fi
+}
+start_postgresql || echo "PostgreSQL setup skipped"
+
 # Start SSH daemon
 echo "Starting SSH daemon on port 2222..."
 /usr/sbin/sshd -D -e &
