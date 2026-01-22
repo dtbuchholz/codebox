@@ -617,6 +617,9 @@ This usually means Takopi isn't passing your API credentials to Claude Code corr
 
    > **Important**: `tmux kill-server` ensures the new session gets fresh environment
    > variables. `kill-session` alone may leave a stale tmux server with old env vars.
+   >
+   > Note: After `fly deploy`, you may still need to manually restart Takopi if the
+   > deploy didn't fully restart the machine. SSH in and run the commands above.
 
 **General troubleshooting:**
 
