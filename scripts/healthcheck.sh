@@ -164,6 +164,32 @@ start_takopi() {
     fi
 }
 
+sync_claude_config() {
+    # Sync Claude config from remote repo daily
+    # Only runs if CLAUDE_CONFIG_REPO is set and repo is initialized
+    if [ -z "$CLAUDE_CONFIG_REPO" ]; then
+        return 0
+    fi
+
+    if [ ! -d "$AGENT_HOME/.claude/.git" ]; then
+        return 0
+    fi
+
+    # Only sync once per day
+    SYNC_MARKER_FILE="/tmp/claude-config-sync-$(date +%Y%m%d)"
+    if [ -f "$SYNC_MARKER_FILE" ]; then
+        return 0
+    fi
+
+    log "Syncing Claude config (daily)..."
+    if su - agent -c "CLAUDE_CONFIG_REPO='$CLAUDE_CONFIG_REPO' claude-config-sync" 2>/dev/null; then
+        touch "$SYNC_MARKER_FILE"
+        log "Claude config: synced"
+    else
+        log "Claude config: sync failed"
+    fi
+}
+
 run_checks() {
     local failed=0
 
@@ -171,6 +197,7 @@ run_checks() {
     check_sshd || ((failed++))
     check_takopi || ((failed++))
     check_memory || true  # Don't count memory warning as failure
+    sync_claude_config || true  # Don't count sync failure
 
     return $failed
 }

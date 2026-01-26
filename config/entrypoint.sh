@@ -161,10 +161,20 @@ fi
 # Ensure Claude Code config directory exists
 mkdir -p "$AGENT_HOME/.claude"
 
+# Sync Claude config from remote repo if configured
+# Set CLAUDE_CONFIG_REPO to enable (e.g., https://github.com/user/claude-config)
+if [ -n "$CLAUDE_CONFIG_REPO" ]; then
+    echo "Syncing Claude config from $CLAUDE_CONFIG_REPO..."
+    if [ -d "$AGENT_HOME/.claude/.git" ]; then
+        # Already initialized, just pull
+        su - agent -c "CLAUDE_CONFIG_REPO='$CLAUDE_CONFIG_REPO' claude-config-sync" || echo "Warning: Claude config sync failed"
+    else
+        # First time, initialize
+        su - agent -c "CLAUDE_CONFIG_REPO='$CLAUDE_CONFIG_REPO' claude-config-sync --init" || echo "Warning: Claude config init failed"
+    fi
 # Optionally install default Claude Code settings template
-# Set USE_CLAUDE_SETTINGS_TEMPLATE=1 to use the bundled template
-# Skip if user already has settings (e.g., synced from their own repo)
-if [ "${USE_CLAUDE_SETTINGS_TEMPLATE:-0}" = "1" ] && [ ! -f "$AGENT_HOME/.claude/settings.json" ]; then
+# Set USE_CLAUDE_SETTINGS_TEMPLATE=1 to use the bundled template (only if no remote repo)
+elif [ "${USE_CLAUDE_SETTINGS_TEMPLATE:-0}" = "1" ] && [ ! -f "$AGENT_HOME/.claude/settings.json" ]; then
     echo "Installing Claude Code settings template..."
     cp /opt/claude-settings.json "$AGENT_HOME/.claude/settings.json"
 fi

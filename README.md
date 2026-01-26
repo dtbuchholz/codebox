@@ -447,6 +447,8 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 | `takopi-restart`                | Restart Takopi (clears lockfile) |
 | `takopi-restart --upgrade`      | Upgrade and restart Takopi       |
 | `takopi-add-project <name>`     | Add a project to Takopi config   |
+| `claude-config-sync`            | Sync Claude config from remote   |
+| `claude-config-sync --init`     | Initialize Claude config repo    |
 | `psql -U postgres`              | Connect to local PostgreSQL      |
 
 ## Configuration
@@ -460,6 +462,8 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 | `TAILSCALE_AUTHKEY`  | Tailscale auth key | Required |
 | `AUTHORIZED_KEYS`    | SSH public keys    | Required |
 | `WEBHOOK_AUTH_TOKEN` | Webhook auth token | Optional |
+| `CLAUDE_CONFIG_REPO` | Git repo URL for Claude config sync | Optional |
+| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot | `1` |
 
 **VM environment (add to `~/.bashrc`):**
 
@@ -512,6 +516,40 @@ base_branch = "main"
 
 [projects.myproject]
 path = "/data/repos/myproject"
+```
+
+### Claude Config Sync
+
+Sync your Claude Code settings from a remote git repo. This lets you version control
+your settings.json, hooks, and other Claude config.
+
+**Setup:**
+
+1. Create a repo with your Claude config (e.g., `github.com/user/claude-config`)
+2. The repo contents should match `~/.claude/` structure:
+   ```
+   claude-config/
+   ├── settings.json
+   ├── settings.local.json  (optional)
+   └── ...
+   ```
+
+3. Set the env var and deploy:
+   ```bash
+   fly secrets set CLAUDE_CONFIG_REPO=https://github.com/user/claude-config
+   fly deploy
+   ```
+
+**How it works:**
+- On VM boot: clones or pulls the repo to `~/.claude/`
+- Daily: healthcheck pulls latest changes
+- Manual sync: `claude-config-sync`
+
+**Commands:**
+```bash
+claude-config-sync --init     # Initialize (clone) the repo
+claude-config-sync            # Pull latest changes
+claude-config-sync --status   # Show sync status
 ```
 
 ## Directory Structure

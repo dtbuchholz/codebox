@@ -1,0 +1,154 @@
+#!/bin/bash
+# claude-config-sync - Sync Claude Code config from a remote git repo
+#
+# Usage: claude-config-sync [--init]
+#
+# Requires CLAUDE_CONFIG_REPO env var to be set (e.g., https://github.com/user/claude-config)
+#
+# The repo should contain the contents of ~/.claude (settings.json, etc.)
+# On first run (--init), clones the repo. On subsequent runs, pulls latest.
+
+set -e
+
+AGENT_HOME="${AGENT_HOME:-$HOME}"
+CLAUDE_DIR="$AGENT_HOME/.claude"
+REPO_URL="${CLAUDE_CONFIG_REPO:-}"
+
+log() {
+    echo "[claude-config-sync] $*"
+}
+
+usage() {
+    echo "Usage: claude-config-sync [--init]"
+    echo ""
+    echo "Sync Claude Code config from a remote git repo."
+    echo ""
+    echo "Options:"
+    echo "  --init     Initialize (clone) the repo if not present"
+    echo "  --status   Show sync status"
+    echo ""
+    echo "Environment:"
+    echo "  CLAUDE_CONFIG_REPO  Git repo URL (required)"
+    echo ""
+    echo "Example:"
+    echo "  export CLAUDE_CONFIG_REPO=https://github.com/user/claude-config"
+    echo "  claude-config-sync --init"
+    exit 1
+}
+
+check_repo_var() {
+    if [ -z "$REPO_URL" ]; then
+        log "CLAUDE_CONFIG_REPO not set, skipping sync"
+        exit 0
+    fi
+}
+
+is_git_repo() {
+    [ -d "$CLAUDE_DIR/.git" ]
+}
+
+show_status() {
+    check_repo_var
+
+    if is_git_repo; then
+        log "Status: synced"
+        log "Repo: $REPO_URL"
+        log "Local: $CLAUDE_DIR"
+        cd "$CLAUDE_DIR"
+        log "Branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+        log "Last commit: $(git log -1 --format='%h %s' 2>/dev/null || echo 'unknown')"
+
+        # Check if behind remote
+        git fetch --quiet 2>/dev/null || true
+        local behind
+        behind=$(git rev-list HEAD..origin/HEAD --count 2>/dev/null || echo "0")
+        if [ "$behind" -gt 0 ]; then
+            log "Status: $behind commit(s) behind remote"
+        else
+            log "Status: up to date"
+        fi
+    else
+        log "Status: not initialized"
+        log "Run: claude-config-sync --init"
+    fi
+}
+
+init_repo() {
+    check_repo_var
+
+    if is_git_repo; then
+        log "Already initialized, pulling latest..."
+        sync_repo
+        return
+    fi
+
+    log "Initializing Claude config from $REPO_URL"
+
+    # Backup existing config if any
+    if [ -d "$CLAUDE_DIR" ] && [ "$(ls -A "$CLAUDE_DIR" 2>/dev/null)" ]; then
+        local backup="$CLAUDE_DIR.backup.$(date +%Y%m%d%H%M%S)"
+        log "Backing up existing config to $backup"
+        mv "$CLAUDE_DIR" "$backup"
+    fi
+
+    # Clone the repo
+    log "Cloning $REPO_URL to $CLAUDE_DIR"
+    git clone --quiet "$REPO_URL" "$CLAUDE_DIR"
+
+    log "Initialized successfully"
+    show_status
+}
+
+sync_repo() {
+    check_repo_var
+
+    if ! is_git_repo; then
+        log "Not initialized. Run: claude-config-sync --init"
+        exit 1
+    fi
+
+    cd "$CLAUDE_DIR"
+
+    # Check for local changes
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        log "Warning: local changes detected, stashing..."
+        git stash --quiet
+    fi
+
+    # Pull latest
+    log "Pulling latest from remote..."
+    if git pull --quiet --rebase 2>/dev/null; then
+        log "Synced successfully"
+    else
+        log "Warning: pull failed, trying fetch + reset..."
+        git fetch --quiet
+        git reset --hard origin/HEAD --quiet
+        log "Reset to remote HEAD"
+    fi
+}
+
+# Parse args
+case "${1:-}" in
+    --init)
+        init_repo
+        ;;
+    --status)
+        show_status
+        ;;
+    --help|-h)
+        usage
+        ;;
+    "")
+        # Default: sync if initialized, otherwise skip
+        if is_git_repo; then
+            sync_repo
+        else
+            check_repo_var
+            log "Not initialized. Run: claude-config-sync --init"
+        fi
+        ;;
+    *)
+        echo "Unknown option: $1"
+        usage
+        ;;
+esac
