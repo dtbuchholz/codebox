@@ -181,12 +181,13 @@ fi
 
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
-# Export API keys to agent's environment (from Fly secrets)
+# Export secrets to agent's environment (from Fly secrets)
 AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
 {
     [ -n "$ANTHROPIC_API_KEY" ] && echo "export ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\""
     [ -n "$ANTHROPIC_BASE_URL" ] && echo "export ANTHROPIC_BASE_URL=\"$ANTHROPIC_BASE_URL\""
     [ -n "$OPENAI_API_KEY" ] && echo "export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
+    [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
 } > "$AGENT_ENV_FILE"
 chown agent:agent "$AGENT_ENV_FILE"
 chmod 600 "$AGENT_ENV_FILE"
