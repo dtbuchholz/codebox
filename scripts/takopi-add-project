@@ -1,0 +1,128 @@
+#!/bin/bash
+# takopi-add-project - Add a project to Takopi configuration
+#
+# Usage: takopi-add-project <name> [path]
+#
+# Examples:
+#   takopi-add-project myproject                    # Uses /data/repos/myproject
+#   takopi-add-project myproject /data/repos/myproject
+
+set -e
+
+usage() {
+    echo "Usage: takopi-add-project <name> [path]"
+    echo ""
+    echo "Add a project to Takopi configuration."
+    echo ""
+    echo "Arguments:"
+    echo "  name    Project name (used in takopi.toml and /ctx commands)"
+    echo "  path    Path to repo (default: /data/repos/<name>)"
+    echo ""
+    echo "Options:"
+    echo "  --base-branch <branch>  Base branch for worktrees (default: main)"
+    echo "  --no-worktrees          Disable worktree support"
+    echo ""
+    echo "Examples:"
+    echo "  takopi-add-project myproject"
+    echo "  takopi-add-project myproject /data/repos/my-project"
+    echo "  takopi-add-project myproject --base-branch develop"
+    echo ""
+    echo "After adding, bind a Telegram topic to this project:"
+    echo "  1. Create a topic in your Telegram group"
+    echo "  2. Send: /ctx set <name>"
+    exit 1
+}
+
+log() {
+    echo "[takopi] $*"
+}
+
+# Parse args
+NAME=""
+PATH_ARG=""
+BASE_BRANCH="main"
+WORKTREES=true
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --base-branch)
+            BASE_BRANCH="$2"
+            shift 2
+            ;;
+        --no-worktrees)
+            WORKTREES=false
+            shift
+            ;;
+        --help|-h)
+            usage
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            ;;
+        *)
+            if [ -z "$NAME" ]; then
+                NAME="$1"
+            elif [ -z "$PATH_ARG" ]; then
+                PATH_ARG="$1"
+            else
+                echo "Too many arguments"
+                usage
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$NAME" ]; then
+    echo "Error: Project name required"
+    echo ""
+    usage
+fi
+
+# Default path
+if [ -z "$PATH_ARG" ]; then
+    PATH_ARG="/data/repos/$NAME"
+fi
+
+# Validate path exists
+if [ ! -d "$PATH_ARG" ]; then
+    log "Warning: Directory does not exist: $PATH_ARG"
+    log "Clone the repo first:"
+    log "  cd /data/repos && git clone <repo-url> $NAME"
+    exit 1
+fi
+
+# Check if takopi config command is available
+if ! command -v takopi &>/dev/null; then
+    log "Error: takopi not found. Install it first:"
+    log "  uv tool install takopi"
+    exit 1
+fi
+
+log "Adding project '$NAME'..."
+
+# Set project config
+takopi config set "projects.$NAME.path" "$PATH_ARG"
+takopi config set "projects.$NAME.default_engine" "claude"
+
+if [ "$WORKTREES" = true ]; then
+    takopi config set "projects.$NAME.worktrees_dir" ".worktrees"
+    takopi config set "projects.$NAME.worktree_base" "$BASE_BRANCH"
+fi
+
+log "Project '$NAME' added successfully"
+log ""
+log "Config added to ~/.takopi/takopi.toml:"
+log "  [projects.$NAME]"
+log "  path = \"$PATH_ARG\""
+log "  default_engine = \"claude\""
+if [ "$WORKTREES" = true ]; then
+    log "  worktrees_dir = \".worktrees\""
+    log "  worktree_base = \"$BASE_BRANCH\""
+fi
+log ""
+log "Next steps:"
+log "  1. Create a topic in your Telegram group"
+log "  2. In that topic, send: /ctx set $NAME"
+log "  3. Messages in that topic now go to '$NAME'"

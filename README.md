@@ -237,11 +237,11 @@ cc-attach myproject
 
 **Via Telegram (optional):**
 
-Just message your bot! Takopi routes messages to Claude Code.
+With forum topics enabled, each topic is bound to a project - just send messages directly without prefixes.
 
-- Use `/ctx set myproject` to set project context
-- Use `/ctx set myproject @branch` to set project and branch
-- Use `/claude` to start a Claude session
+- Create a topic in your Telegram group for each project
+- Send `/ctx set myproject` in that topic to bind it
+- Now just send messages - no `/claude` prefix needed
 - Send voice notes - they're transcribed automatically
 - Send files - they're saved to the project
 
@@ -285,14 +285,55 @@ Takopi provides secure, authenticated Telegram integration:
    > **Note**: If your Telegram group was upgraded to a supergroup (e.g., when enabling topics),
    > the chat ID changes. Look for the new ID in the error message and update your config.
 
-5. **Add your projects** to `~/.takopi/takopi.toml`:
+5. **Add your projects**:
+
+   ```bash
+   # Clone the repo first
+   cd /data/repos
+   git clone git@github.com:your-org/myproject.git
+
+   # Add it to takopi config (sets path, engine, worktrees automatically)
+   takopi-add-project myproject
+   ```
+
+   Options:
+   ```bash
+   takopi-add-project myproject /custom/path    # Custom path
+   takopi-add-project myproject --base-branch develop  # Different base branch
+   takopi-add-project myproject --no-worktrees  # Disable worktrees
+   ```
+
+   Or edit `~/.takopi/takopi.toml` directly:
 
    ```toml
    [projects.myproject]
    path = "/data/repos/myproject"
+   default_engine = "claude"
+   worktrees_dir = ".worktrees"
+   worktree_base = "main"
    ```
 
-6. **Takopi auto-starts** on VM boot if configured. To manually start/restart:
+   > **Note**: Takopi watches `takopi.toml` for changes (`watch_config = true`), so new
+   > projects are available immediately without restarting.
+
+6. **Set up forum topics** (recommended for multiple projects):
+
+   Your bot needs admin permissions with "Manage Topics" enabled in the Telegram group.
+
+   For each project, create a topic in Telegram and bind it:
+
+   1. Create a new topic in your Telegram group (Telegram UI → "Create Topic")
+   2. In that topic, send `/ctx set myproject`
+   3. All messages in that topic now go directly to `myproject` without needing `/claude`
+
+   Useful topic commands:
+   - `/ctx` - Show current project/branch binding
+   - `/ctx set <project>` - Bind topic to a project
+   - `/ctx set <project> @branch` - Bind to project and branch
+   - `/ctx clear` - Remove binding
+   - `/new` - Clear session and start fresh
+
+7. **Takopi auto-starts** on VM boot if configured. To manually start/restart:
 
    ```bash
    # Restart Takopi (handles stale lockfiles automatically)
@@ -405,6 +446,7 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 | `takopi`                        | Run Takopi (Telegram interface)  |
 | `takopi-restart`                | Restart Takopi (clears lockfile) |
 | `takopi-restart --upgrade`      | Upgrade and restart Takopi       |
+| `takopi-add-project <name>`     | Add a project to Takopi config   |
 | `psql -U postgres`              | Connect to local PostgreSQL      |
 
 ## Configuration
