@@ -157,6 +157,15 @@ fi
 
 # Ensure Claude Code config directory exists
 mkdir -p "$AGENT_HOME/.claude"
+
+# Optionally install default Claude Code settings template
+# Set USE_CLAUDE_SETTINGS_TEMPLATE=1 to use the bundled template
+# Skip if user already has settings (e.g., synced from their own repo)
+if [ "${USE_CLAUDE_SETTINGS_TEMPLATE:-0}" = "1" ] && [ ! -f "$AGENT_HOME/.claude/settings.json" ]; then
+    echo "Installing Claude Code settings template..."
+    cp /opt/claude-settings.json "$AGENT_HOME/.claude/settings.json"
+fi
+
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
 # Export API keys to agent's environment (from Fly secrets)

@@ -418,6 +418,7 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 | `ANTHROPIC_API_KEY`  | API key (Anthropic direct or OpenRouter)   | Optional |
 | `ANTHROPIC_BASE_URL` | API proxy URL (e.g., `https://openrouter.ai/api`) | Optional |
 | `OPENAI_API_KEY`     | For voice transcription                    | Optional |
+| `USE_CLAUDE_SETTINGS_TEMPLATE` | Set to `1` to install default Claude settings | Optional |
 
 > **Note**: For OpenRouter/proxy setups, use `ANTHROPIC_API_KEY` with your proxy's key
 > (e.g., `sk-or-v1-...`). Also set `use_api_billing = true` in Takopi's `[claude]` config.
