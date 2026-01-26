@@ -94,10 +94,11 @@ RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/takopi-* /usr/local/bin/healthch
 # Copy config files
 COPY config/entrypoint.sh /entrypoint.sh
 COPY config/claude-settings.json /opt/claude-settings.json
-RUN mkdir -p /opt/config
+RUN mkdir -p /opt/config /opt/git-hooks
 COPY config/agentbox.toml.example /opt/config/agentbox.toml.example
 COPY config/takopi.toml.example /opt/config/takopi.toml.example
-RUN chmod +x /entrypoint.sh
+COPY config/git-hooks/ /opt/git-hooks/
+RUN chmod +x /entrypoint.sh /opt/git-hooks/*
 
 # Expose ports (internal - Tailscale handles external access)
 # 2222: SSH

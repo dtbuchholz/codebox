@@ -149,10 +149,13 @@ if [ "${ENABLE_WEBHOOK:-1}" = "1" ]; then
     WEBHOOK_PID=$!
 fi
 
-# Install Claude Code if not already installed
+# Install or update Claude Code
 if ! command -v claude &> /dev/null; then
     echo "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code || echo "Claude Code install will complete on first run"
+elif [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ]; then
+    echo "Checking for Claude Code updates..."
+    npm update -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code update check skipped"
 fi
 
 # Ensure Claude Code config directory exists

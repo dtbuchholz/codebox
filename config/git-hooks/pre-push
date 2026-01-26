@@ -1,0 +1,31 @@
+#!/bin/bash
+# pre-push hook - Prevent direct pushes to protected branches
+#
+# Install: cp this to .git/hooks/pre-push in each repo
+# Or install globally: git config --global core.hooksPath /path/to/hooks
+#
+# Note: This blocks ALL pushes to main/master, including force pushes after rebase.
+# Only install this on repos where you want strict protection.
+
+PROTECTED_BRANCHES="main master"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Extract branch name from ref
+    branch=$(echo "$remote_ref" | sed 's|refs/heads/||')
+
+    for protected in $PROTECTED_BRANCHES; do
+        if [ "$branch" = "$protected" ]; then
+            echo "ERROR: Direct push to '$protected' is not allowed."
+            echo ""
+            echo "Create a PR instead:"
+            echo "  git checkout -b feature/my-change"
+            echo "  git push -u origin feature/my-change"
+            echo "  gh pr create"
+            echo ""
+            echo "To bypass (use with caution): git push --no-verify"
+            exit 1
+        fi
+    done
+done
+
+exit 0

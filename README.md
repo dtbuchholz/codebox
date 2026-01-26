@@ -602,6 +602,41 @@ ENABLE_HEALTHCHECK=0
 - **Tailscale-only access**: No public ports exposed
 - **SSH key auth only**: Password auth disabled
 - **Telegram encryption**: Bot token + chat ID authentication
+- **Protected branches**: Claude Code is blocked from pushing to main/master
+
+### Branch Protection
+
+Claude Code is configured to block direct pushes to protected branches (main/master) and force pushes.
+This is enforced via:
+
+1. **Claude Code PreToolUse hook** (`~/.claude/settings.json`):
+
+   A hook script runs before every Bash command and blocks pushes to main/master:
+   ```json
+   {
+     "hooks": {
+       "PreToolUse": [{
+         "matcher": "Bash",
+         "hooks": [{"type": "command", "command": "/usr/local/bin/claude-hook-check-push"}]
+       }]
+     }
+   }
+   ```
+
+   The hook catches all patterns: `git push origin main`, `git push origin HEAD:main`, etc.
+
+2. **Git pre-push hook** (optional) - Install per-repo for additional protection:
+   ```bash
+   cp /opt/git-hooks/pre-push /data/repos/myproject/.git/hooks/
+   ```
+
+To enable Claude Code settings protection, set in your Fly secrets or entrypoint:
+```bash
+fly secrets set USE_CLAUDE_SETTINGS_TEMPLATE=1
+```
+
+> **Note**: The deny rules provide defense-in-depth but aren't foolproof. GitHub branch
+> protection rules are still recommended for critical repos.
 - **Non-root user**: Agents run as `agent` user
 
 ## Troubleshooting
