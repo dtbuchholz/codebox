@@ -1,0 +1,113 @@
+#!/bin/bash
+# takopi-restart - Restart the Takopi Telegram bot
+#
+# Usage: takopi-restart [--upgrade]
+#
+# Options:
+#   --upgrade    Update takopi to latest version before restarting
+
+set -e
+
+AGENT_HOME="${AGENT_HOME:-/data/home/agent}"
+TAKOPI_LOCK="$AGENT_HOME/.takopi/takopi.lock"
+
+usage() {
+    echo "Usage: takopi-restart [--upgrade]"
+    echo ""
+    echo "Restart the Takopi Telegram bot."
+    echo ""
+    echo "Options:"
+    echo "  --upgrade    Update takopi to latest version before restarting"
+    echo "  --status     Show current status only"
+    echo ""
+    exit 1
+}
+
+log() {
+    echo "[takopi] $*"
+}
+
+show_status() {
+    if tmux has-session -t takopi 2>/dev/null; then
+        log "Status: running"
+        # Show takopi version
+        if command -v takopi &>/dev/null; then
+            log "Version: $(takopi --version 2>/dev/null || echo 'unknown')"
+        fi
+    else
+        log "Status: not running"
+    fi
+}
+
+# Parse args
+UPGRADE=""
+STATUS_ONLY=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --upgrade)
+            UPGRADE=1
+            shift
+            ;;
+        --status)
+            STATUS_ONLY=1
+            shift
+            ;;
+        --help|-h)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;;
+    esac
+done
+
+# Status only mode
+if [ -n "$STATUS_ONLY" ]; then
+    show_status
+    exit 0
+fi
+
+# Check if takopi is configured
+if [ ! -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
+    log "Error: Takopi not configured (no ~/.takopi/takopi.toml)"
+    exit 1
+fi
+
+# Upgrade if requested
+if [ -n "$UPGRADE" ]; then
+    log "Upgrading takopi..."
+    if command -v uv &>/dev/null; then
+        uv tool upgrade takopi || log "Warning: upgrade failed, continuing with current version"
+    else
+        log "Warning: uv not found, skipping upgrade"
+    fi
+fi
+
+# Stop existing session
+if tmux has-session -t takopi 2>/dev/null; then
+    log "Stopping existing takopi session..."
+    tmux kill-session -t takopi 2>/dev/null || true
+    sleep 1
+fi
+
+# Remove stale lockfile
+if [ -f "$TAKOPI_LOCK" ]; then
+    log "Removing lockfile..."
+    rm -f "$TAKOPI_LOCK"
+fi
+
+# Start takopi
+log "Starting takopi..."
+tmux new-session -d -s takopi "source ~/.env.secrets 2>/dev/null; takopi"
+
+# Verify it started
+sleep 2
+if tmux has-session -t takopi 2>/dev/null; then
+    log "Takopi restarted successfully"
+    show_status
+else
+    log "Error: Takopi failed to start"
+    log "Try running 'takopi' directly to see the error"
+    exit 1
+fi

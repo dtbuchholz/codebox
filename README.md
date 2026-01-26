@@ -295,8 +295,14 @@ Takopi provides secure, authenticated Telegram integration:
 6. **Takopi auto-starts** on VM boot if configured. To manually start/restart:
 
    ```bash
-   # Start Takopi (or restart if already running)
-   tmux kill-session -t takopi 2>/dev/null; tmux new -s takopi -d 'bash -l -c takopi'
+   # Restart Takopi (handles stale lockfiles automatically)
+   takopi-restart
+
+   # Upgrade to latest version and restart
+   takopi-restart --upgrade
+
+   # Check status
+   takopi-restart --status
 
    # View logs
    tmux attach -t takopi
@@ -397,6 +403,8 @@ curl -X POST "http://<tailscale-ip>:8080/inbox" \
 | `cc-stop <name>`                | Stop an agent                    |
 | `cc-stop --all`                 | Stop all agents                  |
 | `takopi`                        | Run Takopi (Telegram interface)  |
+| `takopi-restart`                | Restart Takopi (clears lockfile) |
+| `takopi-restart --upgrade`      | Upgrade and restart Takopi       |
 | `psql -U postgres`              | Connect to local PostgreSQL      |
 
 ## Configuration
@@ -437,7 +445,8 @@ voice_transcription = true
 session_mode = "chat"
 
 [transports.telegram.topics]
-enabled = true  # Use forum topics for multiple agents
+enabled = true   # Use forum topics for multiple agents
+scope = "auto"   # "auto", "main", "projects", or "all"
 
 [claude]
 use_api_billing = true            # Required for OpenRouter/proxy setups
@@ -599,9 +608,8 @@ cc-new myagent /data/repos/myproject
 **For Takopi:**
 
 ```bash
-# If env vars were added after tmux server started, kill the server first
-tmux kill-server
-tmux new -s takopi -d 'bash -l -c takopi'
+# Restart Takopi with fresh environment
+takopi-restart
 ```
 
 > **Note**: `tmux kill-session` only kills one session. If the tmux server was started
@@ -631,18 +639,14 @@ This usually means Takopi isn't passing your API credentials to Claude Code corr
    subscription billing. Setting `use_api_billing = true` passes your env vars through
    unchanged.
 
-3. Restart Takopi (use `kill-server`, not `kill-session`):
+3. Restart Takopi:
 
    ```bash
-   tmux kill-server
-   tmux new -s takopi -d 'bash -l -c takopi'
+   takopi-restart
    ```
 
-   > **Important**: `tmux kill-server` ensures the new session gets fresh environment
-   > variables. `kill-session` alone may leave a stale tmux server with old env vars.
-   >
-   > Note: After `fly deploy`, you may still need to manually restart Takopi if the
-   > deploy didn't fully restart the machine. SSH in and run the commands above.
+   > **Note**: After `fly deploy`, you may still need to manually restart Takopi if the
+   > deploy didn't fully restart the machine. SSH in and run `takopi-restart`.
 
 **General troubleshooting:**
 
