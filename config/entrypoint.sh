@@ -183,6 +183,14 @@ if ! grep -q ".env.secrets" "$AGENT_HOME/.bashrc" 2>/dev/null; then
     echo '[ -f ~/.env.secrets ] && source ~/.env.secrets' >> "$AGENT_HOME/.bashrc"
 fi
 
+# Set Node.js memory limits to prevent OOM (default: 2GB max old space)
+# This applies to all Node processes (dev servers, Claude Code, etc.)
+NODE_MAX_MEM="${NODE_MAX_OLD_SPACE_SIZE:-2048}"
+if ! grep -q "NODE_OPTIONS" "$AGENT_HOME/.bashrc" 2>/dev/null; then
+    echo "export NODE_OPTIONS=\"--max-old-space-size=$NODE_MAX_MEM\"" >> "$AGENT_HOME/.bashrc"
+    echo "Configured Node.js memory limit: ${NODE_MAX_MEM}MB"
+fi
+
 # Auto-start Takopi if configured
 if [ -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
     echo "Starting Takopi (Telegram bot)..."

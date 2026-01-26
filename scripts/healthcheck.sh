@@ -77,13 +77,49 @@ check_memory() {
 
     log "Memory: $mem_info $swap_info"
 
-    # Warn if less than 200MB free
-    local free_mb
+    # Get memory values for threshold checks
+    local free_mb used_percent
     free_mb=$(free -m | awk '/^Mem:/ {print $4}')
+    used_percent=$(free -m | awk '/^Mem:/ {printf "%.0f", $3/$2*100}')
+
+    # Log top memory consumers when usage is high (>70%) or free is low (<500MB)
+    if [ "$used_percent" -gt 70 ] || [ "$free_mb" -lt 500 ]; then
+        log "Top memory consumers:"
+        ps aux --sort=-%mem | head -6 | tail -5 | while read -r line; do
+            local user pid mem cmd
+            user=$(echo "$line" | awk '{print $1}')
+            pid=$(echo "$line" | awk '{print $2}')
+            mem=$(echo "$line" | awk '{print $4}')
+            cmd=$(echo "$line" | awk '{for(i=11;i<=NF;i++) printf "%s ", $i; print ""}' | cut -c1-60)
+            log "  ${mem}% (PID $pid, $user): $cmd"
+        done
+    fi
+
+    # Critical warning if less than 200MB free
     if [ "$free_mb" -lt 200 ]; then
-        log "WARNING: Low memory detected (${free_mb}MB free)"
+        log "CRITICAL: Very low memory (${free_mb}MB free) - OOM kill imminent!"
+        # Log all node processes specifically since they tend to be memory hogs
+        local node_procs
+        node_procs=$(pgrep -a node 2>/dev/null | head -5 || true)
+        if [ -n "$node_procs" ]; then
+            log "Node.js processes:"
+            echo "$node_procs" | while read -r line; do
+                local pid
+                pid=$(echo "$line" | awk '{print $1}')
+                local mem_kb
+                mem_kb=$(ps -o rss= -p "$pid" 2>/dev/null || echo "0")
+                local mem_mb=$((mem_kb / 1024))
+                log "  PID $pid: ${mem_mb}MB - $(echo "$line" | cut -d' ' -f2- | cut -c1-50)"
+            done
+        fi
         return 1
     fi
+
+    # Warning if less than 500MB free
+    if [ "$free_mb" -lt 500 ]; then
+        log "WARNING: Low memory detected (${free_mb}MB free)"
+    fi
+
     return 0
 }
 
