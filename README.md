@@ -49,359 +49,171 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 
 ## Quick Start
 
-### 1. Local machine setup
+### Phase 1: Local Setup
 
-You run these steps on your laptop/desktop.
+Run these on your laptop/desktop.
 
-- Install prerequisites:
-  - [Fly.io account](https://fly.io) + `flyctl`
-  - [Tailscale account](https://tailscale.com)
-  - SSH key pair
-  - Telegram account (optional, for chat)
+**Prerequisites:**
+
+- [Fly.io account](https://fly.io) + `flyctl`
+- [Tailscale account](https://tailscale.com)
+- SSH key pair
 
 ```bash
-# Clone this repo
+# Clone and initialize
 git clone https://github.com/your-org/codebox.git
 cd codebox
 
-# Initialize Fly config (creates app + volume interactively)
-make fly-init APP=agent-box-<globally_unique_name>
+# Create Fly app and volume
+make fly-init APP=agent-box-<unique_name>
 
-# Set secrets
+# Set required secrets
 fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
 fly secrets set AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)"
-
-# Optional: webhook auth token
-fly secrets set WEBHOOK_AUTH_TOKEN="$(openssl rand -hex 16)"
 
 # Deploy
 fly deploy
 ```
 
-> **Note**: The `fly-init.sh` script generates `fly.toml` from `fly.toml.example`.
-> The generated `fly.toml` is gitignored since it contains your personal app name.
-
-After deploy, find your Tailscale IP:
+After deploy, get your Tailscale IP:
 
 ```bash
 fly ssh console -C "tailscale ip -4"
 ```
 
-### 2. Remote VM setup
+### Phase 2: VM Setup
 
-You run these steps after SSH-ing into the VM.
+SSH into the VM and run the setup wizard:
 
 ```bash
-# Use your app name as the Tailscale hostname (same as fly apps create)
-ssh agent@agent-box-<yourname>
+ssh agent@agent-box-<yourname>   # Tailscale hostname
+vm-setup                          # Interactive setup wizard
 ```
 
-> **Note**: Tailscale SSH runs on port 22 (default). The `-p 2222` option is only needed
-> for non-Tailscale SSH access, which isn't exposed by default.
+The wizard configures git, GitHub CLI, SSH keys, and optionally Takopi.
 
-**Quick setup (recommended)**: Run the interactive setup wizard:
-
-```bash
-vm-setup
-```
-
-This guides you through configuring git, GitHub CLI, SSH keys, and Takopi.
-
-**Or configure manually** (see below).
-
-Set up SSH keys for cloning private repos:
+**Or configure manually:**
 
 ```bash
-# Generate a deploy key (or copy your existing key)
+# SSH key for GitHub
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
 cat ~/.ssh/id_ed25519.pub
-# Add this public key to your GitHub repo's deploy keys (Settings → Deploy keys)
-```
+# Add to github.com/settings/keys
 
-Then, either add this public key to your GitHub repo's deploy keys (Settings → Deploy keys), or add it to your personal SSH keys:
-
-1. Go to `github.com/settings/keys`
-2. Click "New SSH key"
-3. Paste the public key from above
-
-Clone your repos into the persistent volume:
-
-```bash
+# Clone repos
 cd /data/repos
 git clone git@github.com:your-org/your-repo.git
-```
 
-Authenticate GitHub CLI (for Claude to interact with issues, PRs, etc.):
-
-```bash
+# GitHub CLI
 gh auth login
-# Follow prompts - choose HTTPS and authenticate via browser or token
-```
 
-Configure git identity (required for commits):
-
-```bash
+# Git identity
 git config --global user.email "you@example.com"
 git config --global user.name "Your Name"
 ```
 
-Optional: configure project aliases and defaults:
+**Claude Code authentication** (choose one):
 
 ```bash
-cp /opt/config/agentbox.toml.example /data/config/agentbox.toml
-vi /data/config/agentbox.toml
-```
-
-Optional: install Telegram support (Takopi):
-
-```bash
-# Install uv (adds itself to ~/.bashrc automatically)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.bashrc  # or reconnect
-
-# Install takopi
-uv python install 3.13
-uv tool install -U takopi
-```
-
-Configure Claude Code authentication. Choose one:
-
-**Option A: Fly secrets (recommended - persists across restarts)**
-
-```bash
-# From your local machine:
+# Option A: Fly secrets (recommended)
 fly secrets set ANTHROPIC_API_KEY="sk-ant-..."
 
-# For OpenRouter/proxy:
-fly secrets set ANTHROPIC_API_KEY="sk-or-v1-..." ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-
-# For voice transcription:
-fly secrets set OPENAI_API_KEY="sk-..."
-```
-
-The entrypoint automatically exports these to the agent user's environment.
-
-**Option B: bashrc (simpler, but may not survive all restarts)**
-
-```bash
-# On the VM:
+# Option B: bashrc
 echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
-
-# For OpenRouter:
-cat >> ~/.bashrc << 'EOF'
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_API_KEY="sk-or-v1-..."
-EOF
-```
-
-> **Note**: Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`) with OpenRouter.
-
-**Option C: Interactive login**
-
-```bash
-claude
-# Then use /login when prompted
-```
-
-Optional: Add OpenAI key for voice transcription:
-
-```bash
-echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
-```
-
-After adding to bashrc, reload:
-
-```bash
 source ~/.bashrc
+
+# Option C: Interactive login
+claude   # then use /login
 ```
 
-### 3. Start using agents
-
-**Via SSH:**
+### Phase 3: Start Using Agents
 
 ```bash
-# Create a new agent
+# Create an agent
 cc-new myproject /data/repos/myproject
 
-# Or use project aliases with worktrees
+# Or with git worktree
 cc-new feature @myproject/feature-branch
 
 # List agents
 cc-ls
 
-# Attach to an agent
+# Attach to agent
 cc-attach myproject
 
 # Detach: Ctrl-b d
 ```
 
-**Via Telegram (optional):**
+## Agent Commands
 
-With forum topics enabled, each topic is bound to a project - just send messages directly without prefixes.
-
-- Create a topic in your Telegram group for each project
-- Send `/ctx set myproject` in that topic to bind it
-- Now just send messages - no `/claude` prefix needed
-- Send voice notes - they're transcribed automatically
-- Send files - they're saved to the project
+| Command                         | Description                    |
+| ------------------------------- | ------------------------------ |
+| `cc-new <name> <dir>`           | Create agent in directory      |
+| `cc-new <name> @project/branch` | Create agent with git worktree |
+| `cc-new <name> <dir> --attach`  | Create and attach immediately  |
+| `cc-ls`                         | List all running agents        |
+| `cc-attach <name>`              | Attach to existing agent       |
+| `cc-stop <name>`                | Stop an agent                  |
+| `cc-stop --all`                 | Stop all agents                |
+| `vm-setup`                      | Interactive setup wizard       |
+| `takopi-restart`                | Restart Takopi bot             |
+| `takopi-add-project <name>`     | Add project to Takopi config   |
 
 ## Communication Options
 
-### Option 1: Telegram via Takopi (Recommended)
+### Telegram via Takopi (Recommended)
 
-Takopi provides secure, authenticated Telegram integration:
+Takopi provides secure Telegram integration with voice transcription and file transfers.
 
-- **End-to-end encrypted** (Telegram's encryption)
-- **Voice note transcription** (reply by voice, requires OPENAI_API_KEY)
-- **File transfers** (send/receive files)
-- **Session persistence** (resume conversations)
-- **Forum topics** (one topic per agent)
+**Setup:**
 
-**Setup steps:**
+1. Create a bot via [@BotFather](https://t.me/BotFather) → `/newbot`
+2. Run `takopi` on the VM (wizard guides you through config)
+3. Or manually configure `~/.takopi/takopi.toml`:
 
-1. **Create a Telegram bot**: Message [@BotFather](https://t.me/BotFather) on Telegram
-   - Send `/newbot` and follow prompts
-   - Save the bot token (looks like `123456789:ABCdefGHI...`)
+```toml
+watch_config = true
+default_engine = "claude"
+transport = "telegram"
 
-2. **Run the Takopi wizard** (recommended for first-time setup):
+[transports.telegram]
+bot_token = "YOUR_BOT_TOKEN"
+chat_id = 123456789
+voice_transcription = true
 
-   ```bash
-   takopi
-   ```
+[transports.telegram.topics]
+enabled = true
 
-   The wizard will guide you through configuration.
+[claude]
+use_api_billing = true
+dangerously_skip_permissions = true
 
-3. **Or configure manually**:
+[projects.myproject]
+path = "/data/repos/myproject"
+```
 
-   ```bash
-   mkdir -p ~/.takopi
-   cp /opt/config/takopi.toml.example ~/.takopi/takopi.toml
-   vi ~/.takopi/takopi.toml
-   # Add your bot_token from step 1
-   ```
+4. Add projects: `takopi-add-project myproject`
+5. Set up forum topics in Telegram, bind with `/ctx set myproject`
 
-4. **Get your chat ID**: Send any message to your bot. It will reply with your chat ID. Add this to your config.
+**Commands:**
 
-   > **Note**: If your Telegram group was upgraded to a supergroup (e.g., when enabling topics),
-   > the chat ID changes. Look for the new ID in the error message and update your config.
+```bash
+takopi-restart             # Restart (clears lockfile)
+takopi-restart --upgrade   # Upgrade and restart
+takopi-restart --status    # Check status
+```
 
-5. **Add your projects**:
-
-   ```bash
-   # Clone the repo first
-   cd /data/repos
-   git clone git@github.com:your-org/myproject.git
-
-   # Add it to takopi config (sets path, engine, worktrees automatically)
-   takopi-add-project myproject
-   ```
-
-   Options:
-   ```bash
-   takopi-add-project myproject /custom/path    # Custom path
-   takopi-add-project myproject --base-branch develop  # Different base branch
-   takopi-add-project myproject --no-worktrees  # Disable worktrees
-   ```
-
-   Or edit `~/.takopi/takopi.toml` directly:
-
-   ```toml
-   [projects.myproject]
-   path = "/data/repos/myproject"
-   default_engine = "claude"
-   worktrees_dir = ".worktrees"
-   worktree_base = "main"
-   ```
-
-   > **Note**: Takopi watches `takopi.toml` for changes (`watch_config = true`), so new
-   > projects are available immediately without restarting.
-
-6. **Set up forum topics** (recommended for multiple projects):
-
-   Your bot needs admin permissions with "Manage Topics" enabled in the Telegram group.
-
-   For each project, create a topic in Telegram and bind it:
-
-   1. Create a new topic in your Telegram group (Telegram UI → "Create Topic")
-   2. In that topic, send `/ctx set myproject`
-   3. All messages in that topic now go directly to `myproject` without needing `/claude`
-
-   Useful topic commands:
-   - `/ctx` - Show current project/branch binding
-   - `/ctx set <project>` - Bind topic to a project
-   - `/ctx set <project> @branch` - Bind to project and branch
-   - `/ctx clear` - Remove binding
-   - `/new` - Clear session and start fresh
-
-7. **Takopi auto-starts** on VM boot if configured. To manually start/restart:
-
-   ```bash
-   # Restart Takopi (handles stale lockfiles automatically)
-   takopi-restart
-
-   # Upgrade to latest version and restart
-   takopi-restart --upgrade
-
-   # Check status
-   takopi-restart --status
-
-   # View logs
-   tmux attach -t takopi
-   # Press Ctrl-b d to detach
-   ```
-
-   > **Note**: If Takopi fails to start automatically, check `/data/logs/healthcheck.log` for errors.
-   > The health check watchdog will attempt to restart Takopi automatically.
-
-> **Note**: If you configured Takopi locally first, copy the config to the VM:
->
-> ```bash
-> # Tailscale SSH may not support scp directly. Use ssh + cat instead:
-> cat ~/.takopi/takopi.toml | ssh agent@agent-box-<yourname> 'mkdir -p ~/.takopi && cat > ~/.takopi/takopi.toml'
-> ```
-
-### Option 2: SSH + tmux
+### SSH + tmux
 
 Direct terminal access via Tailscale:
 
 ```bash
 ssh agent@agent-box-<yourname>
 cc-attach myproject
+# Detach: Ctrl-b d
 ```
 
-### Multi-Device Access
-
-You can access agents from both your phone and laptop, but the two access methods work differently:
-
-| Method | How Claude runs | Multi-device access |
-| ------ | --------------- | ------------------- |
-| Telegram (Takopi) | Subprocess of Takopi | Open Telegram on any device |
-| SSH (cc-* scripts) | tmux session | `cc-attach` from any SSH session |
-
-**Takopi sessions** run Claude as a subprocess - you can't attach via SSH, but you can open Telegram on your laptop and message the same bot. Both devices see the same conversation.
-
-**tmux sessions** (via `cc-new`/`cc-attach`) are independent from Takopi. Multiple SSH sessions can attach to the same tmux session simultaneously:
-
-```bash
-# Terminal 1 (laptop)
-ssh agent@agent-box-yourname
-cc-attach myagent
-
-# Terminal 2 (another laptop, or phone via Blink/Termius)
-ssh agent@agent-box-yourname
-cc-attach myagent
-# Both terminals now show the same Claude session
-```
-
-**Bridging both methods**: If you start a session via SSH and want to continue from Telegram (or vice versa), use Claude's resume feature:
-
-```bash
-# In SSH tmux session, note the session ID from Claude's output
-# Then in Telegram:
-/claude --resume <session-id> continue working on the feature
-```
-
-### Option 3: Webhook (Legacy)
+### Webhook (Legacy)
 
 HTTP webhook for custom integrations:
 
@@ -412,95 +224,37 @@ curl -X POST "http://<tailscale-ip>:8080/send" \
   -d "message=your response"
 ```
 
-JSON payloads are also supported:
+### Multi-Device Access
 
-```bash
-curl -X POST "http://<tailscale-ip>:8080/inbox" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"agent":"myproject","message":"hello","inject":true}'
-```
+| Method   | How Claude runs      | Multi-device                        |
+| -------- | -------------------- | ----------------------------------- |
+| Telegram | Subprocess of Takopi | Open Telegram on any device         |
+| SSH      | tmux session         | `cc-attach` from any SSH connection |
 
-## Commands
-
-### Local (your machine)
-
-| Command                            | Description                              |
-| ---------------------------------- | ---------------------------------------- |
-| `./scripts/fly-init.sh <app-name>` | Generate fly.toml, create Fly app/volume |
-| `make fly-init APP=<name>`         | Same as above, via Makefile              |
-| `fly deploy`                       | Deploy to Fly.io                         |
-| `fly logs`                         | View Fly.io logs                         |
-
-### Remote (on the VM)
-
-| Command                         | Description                      |
-| ------------------------------- | -------------------------------- |
-| `vm-setup`                      | Interactive setup wizard         |
-| `cc-ls`                         | List all running agents          |
-| `cc-new <name> <dir>`           | Create a new agent in directory  |
-| `cc-new <name> @project/branch` | Create agent with git worktree   |
-| `cc-attach <name>`              | Attach to an existing agent      |
-| `cc-stop <name>`                | Stop an agent                    |
-| `cc-stop --all`                 | Stop all agents                  |
-| `takopi`                        | Run Takopi (Telegram interface)  |
-| `takopi-restart`                | Restart Takopi (clears lockfile) |
-| `takopi-restart --upgrade`      | Upgrade and restart Takopi       |
-| `takopi-add-project <name>`     | Add a project to Takopi config   |
-| `claude-config-sync`            | Sync Claude config from remote   |
-| `claude-config-sync --init`     | Initialize Claude config repo    |
-| `psql -U postgres`              | Connect to local PostgreSQL      |
+Multiple SSH sessions can attach to the same tmux session simultaneously.
 
 ## Configuration
 
-### Environment Variables
+### Fly.io Secrets
 
-**Fly.io secrets (set via `fly secrets set`):**
+Set via `fly secrets set`:
 
-| Variable             | Description        | Default  |
-| -------------------- | ------------------ | -------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key | Required |
-| `AUTHORIZED_KEYS`    | SSH public keys    | Required |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token | Optional |
-| `CLAUDE_CONFIG_REPO` | Git repo URL for Claude config sync | Optional |
-| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot | `1` |
+| Variable             | Description                     | Required        |
+| -------------------- | ------------------------------- | --------------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key              | Yes             |
+| `AUTHORIZED_KEYS`    | SSH public keys                 | Yes             |
+| `ANTHROPIC_API_KEY`  | Claude API key                  | No              |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token              | No              |
+| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync | No              |
+| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot | No (default: 1) |
 
-**VM environment (add to `~/.bashrc`):**
+### VM Environment (`~/.bashrc`)
 
-| Variable             | Description                                | Default  |
-| -------------------- | ------------------------------------------ | -------- |
-| `ANTHROPIC_API_KEY`  | API key (Anthropic direct or OpenRouter)   | Optional |
-| `ANTHROPIC_BASE_URL` | API proxy URL (e.g., `https://openrouter.ai/api`) | Optional |
-| `OPENAI_API_KEY`     | For voice transcription                    | Optional |
-| `USE_CLAUDE_SETTINGS_TEMPLATE` | Set to `1` to install default Claude settings | Optional |
-
-> **Note**: For OpenRouter/proxy setups, use `ANTHROPIC_API_KEY` with your proxy's key
-> (e.g., `sk-or-v1-...`). Also set `use_api_billing = true` in Takopi's `[claude]` config.
-
-### Takopi Config (`~/.takopi/takopi.toml`)
-
-```toml
-watch_config = true  # Hot-reload config changes (no restart needed for new projects)
-default_engine = "claude"
-transport = "telegram"
-
-[transports.telegram]
-bot_token = "YOUR_BOT_TOKEN"
-chat_id = 123456789
-voice_transcription = true
-session_mode = "chat"
-
-[transports.telegram.topics]
-enabled = true   # Use forum topics for multiple agents
-scope = "auto"   # "auto", "main", "projects", or "all"
-
-[claude]
-use_api_billing = true            # Required for OpenRouter/proxy setups
-dangerously_skip_permissions = true  # Auto-approve tool calls
-
-[projects.myproject]
-path = "/data/repos/myproject"
-```
+| Variable             | Description                       |
+| -------------------- | --------------------------------- |
+| `ANTHROPIC_API_KEY`  | API key (Anthropic or OpenRouter) |
+| `ANTHROPIC_BASE_URL` | Proxy URL (e.g., OpenRouter)      |
+| `OPENAI_API_KEY`     | For voice transcription           |
 
 ### Agent Box Config (`/data/config/agentbox.toml`)
 
@@ -520,76 +274,112 @@ path = "/data/repos/myproject"
 
 ### Claude Config Sync
 
-Sync your Claude Code settings from a remote git repo. This lets you version control
-your settings.json, hooks, and other Claude config.
+Sync Claude Code settings from a git repo:
 
-**Setup:**
-
-1. Create a repo with your Claude config (e.g., `github.com/user/claude-config`)
-2. The repo contents should match `~/.claude/` structure:
-   ```
-   claude-config/
-   ├── settings.json
-   ├── settings.local.json  (optional)
-   └── ...
-   ```
-
-3. Set the env var and deploy:
-   ```bash
-   fly secrets set CLAUDE_CONFIG_REPO=https://github.com/user/claude-config
-   fly deploy
-   ```
-
-**How it works:**
-- On VM boot: clones or pulls the repo to `~/.claude/`
-- Daily: healthcheck pulls latest changes
-- Manual sync: `claude-config-sync`
-
-**Commands:**
 ```bash
-claude-config-sync --init     # Initialize (clone) the repo
-claude-config-sync            # Pull latest changes
-claude-config-sync --status   # Show sync status
+# Set repo URL
+fly secrets set CLAUDE_CONFIG_REPO=https://github.com/user/claude-config
+
+# Manual sync
+claude-config-sync
+claude-config-sync --init    # First-time clone
+claude-config-sync --status  # Check status
+```
+
+The repo structure should match `~/.claude/`:
+
+```
+claude-config/
+├── settings.json
+└── settings.local.json
 ```
 
 ## Directory Structure
 
 ```
-/data/
-├── repos/              # Clone your repositories here
-├── worktrees/          # Git worktrees (one per agent/branch)
-├── postgresql/         # PostgreSQL data (persistent)
+/data/                    # Persistent Fly volume
+├── repos/                # Git repositories
+├── worktrees/            # Git worktrees (one per agent/branch)
 ├── logs/
-│   ├── <agent>/        # Logs per agent
-│   └── healthcheck.log # Health monitor logs
-├── home/agent/         # Persistent home directory
-│   ├── .claude/        # Claude Code config & hooks
-│   ├── .takopi/        # Takopi config & state
-│   └── .ssh/           # SSH authorized_keys
+│   ├── <agent>/          # Logs per agent
+│   └── healthcheck.log   # Health monitor logs
+├── home/agent/           # Persistent home directory
+│   ├── .claude/          # Claude Code config & hooks
+│   ├── .takopi/          # Takopi config & state
+│   └── .ssh/             # SSH keys
 └── config/
-    ├── agentbox.toml   # Agent box settings
-    ├── tailscale.state # Tailscale state
-    └── ssh_host_*      # SSH host keys
+    ├── agentbox.toml     # Agent box settings
+    ├── tailscale.state   # Tailscale state
+    └── ssh_host_*        # SSH host keys
 ```
 
 ## Pre-installed Tools
 
-The VM includes common development tools:
+| Tool                | Description                            |
+| ------------------- | -------------------------------------- |
+| `claude`            | Claude Code CLI                        |
+| `gh`                | GitHub CLI                             |
+| `git`               | Version control                        |
+| `psql`              | PostgreSQL client (server auto-starts) |
+| `pnpm`              | Node.js package manager                |
+| `node`              | Node.js 22.x LTS                       |
+| `yazi`              | Terminal file manager                  |
+| `vim`, `htop`, `jq` | Common utilities                       |
 
-| Tool | Description |
-| ---- | ----------- |
-| `claude` | Claude Code CLI |
-| `gh` | GitHub CLI for issues, PRs, etc. |
-| `git` | Version control |
-| `psql` | PostgreSQL client (server auto-starts) |
-| `pnpm` | Fast Node.js package manager |
-| `node` | Node.js 22.x LTS |
-| `yazi` | Terminal file manager (TUI) |
-| `vim`, `htop`, `jq` | Common utilities |
+## Health Monitoring
+
+Agent Box monitors services every 60 seconds:
+
+| Service   | Check               | Auto-Recovery |
+| --------- | ------------------- | ------------- |
+| Takopi    | tmux session exists | Yes           |
+| Tailscale | `tailscale status`  | No            |
+| SSH       | `pgrep sshd`        | No            |
+| Memory    | warns < 200MB free  | No            |
+
+```bash
+# View logs
+tail -f /data/logs/healthcheck.log
+
+# Disable watchdog
+ENABLE_HEALTHCHECK=0
+```
+
+## Security
+
+- **Tailscale-only access**: No public ports exposed
+- **SSH key auth only**: Password auth disabled
+- **Protected branches**: Claude Code blocked from pushing to main/master
+- **Non-root user**: Agents run as `agent` user
+
+### Branch Protection
+
+Claude Code is configured to block pushes to main/master via a PreToolUse hook:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "/usr/local/bin/claude-hook-check-push" }]
+      }
+    ]
+  }
+}
+```
+
+Enable with: `fly secrets set USE_CLAUDE_SETTINGS_TEMPLATE=1`
+
+Optional git pre-push hook for additional protection:
+
+```bash
+cp /opt/git-hooks/pre-push /data/repos/myproject/.git/hooks/
+```
 
 ## iOS Workflow
 
-### Via Telegram (Easiest)
+### Via Telegram
 
 1. Open Telegram
 2. Message your bot
@@ -597,216 +387,90 @@ The VM includes common development tools:
 
 ### Via SSH
 
-1. **Tailscale app**: Connect to your tailnet
-2. **SSH app** (Blink/Termius): Save a profile for `agent@agent-box-<yourname>` (port 22)
-3. **On connect**: See MOTD with active agents
-4. **Attach**: `cc-attach <agent-name>`
-5. **Respond to Claude**: Type your response
-6. **Detach**: `Ctrl-b d`
-
-## Health Monitoring
-
-Agent Box includes automatic health monitoring that:
-
-- **Auto-starts Takopi** on VM boot (if configured)
-- **Monitors services** (Takopi, Tailscale, SSH) every 60 seconds
-- **Auto-restarts Takopi** if it crashes
-- **Logs memory usage** and warns if low
-
-### Health Check Commands
-
-```bash
-# Run health check manually
-healthcheck.sh
-
-# View health check logs
-tail -f /data/logs/healthcheck.log
-
-# Disable health check watchdog (env var)
-ENABLE_HEALTHCHECK=0
-```
-
-### What Gets Monitored
-
-| Service | Check | Auto-Recovery |
-| ------- | ----- | ------------- |
-| Takopi | tmux session exists | Yes - restarts automatically |
-| Tailscale | `tailscale status` | No - logs only |
-| SSH | `pgrep sshd` | No - logs only |
-| Memory | `free -m` (warns < 200MB) | No - logs only |
-
-## Security
-
-- **Tailscale-only access**: No public ports exposed
-- **SSH key auth only**: Password auth disabled
-- **Telegram encryption**: Bot token + chat ID authentication
-- **Protected branches**: Claude Code is blocked from pushing to main/master
-
-### Branch Protection
-
-Claude Code is configured to block direct pushes to protected branches (main/master) and force pushes.
-This is enforced via:
-
-1. **Claude Code PreToolUse hook** (`~/.claude/settings.json`):
-
-   A hook script runs before every Bash command and blocks pushes to main/master:
-   ```json
-   {
-     "hooks": {
-       "PreToolUse": [{
-         "matcher": "Bash",
-         "hooks": [{"type": "command", "command": "/usr/local/bin/claude-hook-check-push"}]
-       }]
-     }
-   }
-   ```
-
-   The hook catches all patterns: `git push origin main`, `git push origin HEAD:main`, etc.
-
-2. **Git pre-push hook** (optional) - Install per-repo for additional protection:
-   ```bash
-   cp /opt/git-hooks/pre-push /data/repos/myproject/.git/hooks/
-   ```
-
-To enable Claude Code settings protection, set in your Fly secrets or entrypoint:
-```bash
-fly secrets set USE_CLAUDE_SETTINGS_TEMPLATE=1
-```
-
-> **Note**: The deny rules provide defense-in-depth but aren't foolproof. GitHub branch
-> protection rules are still recommended for critical repos.
-- **Non-root user**: Agents run as `agent` user
+1. Connect Tailscale app
+2. SSH app (Blink/Termius): `agent@agent-box-<yourname>` port 22
+3. Attach: `cc-attach <agent-name>`
+4. Detach: `Ctrl-b d`
 
 ## Troubleshooting
 
-### Can't connect via SSH
+### Connection Issues
 
-- Check Tailscale is connected: `tailscale status`
-- Verify SSH key is set: `fly secrets list`
-- Check logs: `fly logs`
-
-### Fly app name already taken
-
-- App names are global across Fly.io, not just your org.
-- Pick a unique name and re-run: `./scripts/fly-init.sh agent-box-<newname>`
-
-### Telegram not working
-
-- Verify bot token: message @BotFather, use `/mybots` to check
-- Check Takopi config: `cat ~/.takopi/takopi.toml`
-- Ensure chat_id is set (bot tells you on first message)
-- View Takopi logs: `takopi --verbose`
-
-### Voice transcription not working
-
-- Ensure OPENAI_API_KEY is set: `echo $OPENAI_API_KEY`
-- Check it's exported in your shell config (~/.bashrc)
-
-### Agent not starting
-
-- Check tmux: `tmux ls`
-- Check Claude Code: `which claude`
-- View logs: `cat /data/logs/<agent>/`
-
-### Environment variables not working
-
-If you update `~/.bashrc`, existing tmux sessions won't pick up the changes.
-
-**For agents (cc-new):**
+**Can't connect via SSH:**
 
 ```bash
-cc-stop myagent
-source ~/.bashrc
-cc-new myagent /data/repos/myproject
+tailscale status          # Check Tailscale
+fly secrets list          # Verify SSH key set
+fly logs                  # Check logs
 ```
 
-**For Takopi:**
+**Fly app name taken:** Names are global. Pick unique name: `./scripts/fly-init.sh agent-box-<newname>`
+
+### Telegram Issues
+
+**Bot not responding:**
 
 ```bash
-# Restart Takopi with fresh environment
+cat ~/.takopi/takopi.toml  # Check config
+takopi --verbose           # Debug mode
+```
+
+**Voice not working:** Ensure `OPENAI_API_KEY` is set in `~/.bashrc`
+
+### Agent Issues
+
+**Agent not starting:**
+
+```bash
+tmux ls                    # Check tmux
+which claude               # Verify Claude installed
+cat /data/logs/<agent>/    # View logs
+```
+
+**Environment variables not working:**
+
+```bash
+# For agents
+cc-stop myagent && source ~/.bashrc && cc-new myagent /path
+
+# For Takopi
 takopi-restart
 ```
 
-> **Note**: `tmux kill-session` only kills one session. If the tmux server was started
-> before your env vars were set, use `tmux kill-server` to restart fresh.
+> Note: `tmux kill-server` restarts all sessions with fresh env.
 
-### Takopi shows "Invalid API key"
+### API Key Issues
 
-This usually means Takopi isn't passing your API credentials to Claude Code correctly.
+**"Invalid API key" with OpenRouter:**
 
-**If using OpenRouter or a proxy:**
+1. Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`)
+2. Set `use_api_billing = true` in `~/.takopi/takopi.toml`
+3. Run `takopi-restart`
 
-1. Use `ANTHROPIC_API_KEY` (not `ANTHROPIC_AUTH_TOKEN`) in `~/.bashrc`:
+### Performance Issues
 
-   ```bash
-   export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-   export ANTHROPIC_API_KEY="sk-or-v1-..."
-   ```
+**VM freezes during heavy operations:**
 
-2. Enable API billing mode in `~/.takopi/takopi.toml`:
-
-   ```toml
-   [claude]
-   use_api_billing = true
-   ```
-
-   By default, Takopi strips `ANTHROPIC_API_KEY` from the environment to prefer
-   subscription billing. Setting `use_api_billing = true` passes your env vars through
-   unchanged.
-
-3. Restart Takopi:
-
-   ```bash
-   takopi-restart
-   ```
-
-   > **Note**: After `fly deploy`, you may still need to manually restart Takopi if the
-   > deploy didn't fully restart the machine. SSH in and run `takopi-restart`.
-
-**General troubleshooting:**
-
-- Ensure Claude Code auth is configured in `~/.bashrc` (see setup step)
-- Restart Takopi with a login shell: `bash -l -c takopi`
-- Verify env vars are set: `bash -l -c 'echo $ANTHROPIC_API_KEY'`
-- Check that direct `claude` command works: `bash -l -c claude`
-
-### VM freezes or becomes unresponsive
-
-If the VM freezes during heavy Claude operations (parallel file searches, large repos):
-
-**Symptoms:**
-- SSH hangs or times out
-- Telegram bot stops responding
-- `fly ssh console` hangs
-
-**Immediate fix:**
 ```bash
-fly machines list                    # Get machine ID
-fly machines restart <machine-id>    # Restart the machine
+fly machines list                  # Get machine ID
+fly machines restart <machine-id>  # Restart
+
+# Prevent: increase memory
+fly scale memory 4096
 ```
 
-**Root cause:** Usually out-of-memory (OOM). Claude Code can spike memory usage during
-parallel operations (multiple globs, greps, reads at once).
+Swap (2GB) is auto-configured. Check for OOM: `dmesg | grep -i "out of memory"`
 
-**Prevention:**
+## Local Development
 
-1. **Increase memory** (recommended for active use):
-   ```bash
-   fly scale memory 4096   # 4GB instead of 2GB
-   ```
-
-2. **Swap is auto-configured** - The entrypoint creates a 2GB swap file on `/data` to
-   handle spikes. Adjust with `SWAP_SIZE_MB` env var if needed.
-
-3. **Monitor memory** - Health check logs memory usage every 60s:
-   ```bash
-   tail -f /data/logs/healthcheck.log
-   ```
-
-4. **Check for OOM kills** (after restart):
-   ```bash
-   dmesg | grep -i "out of memory"
-   ```
+```bash
+make setup        # Install hooks
+make lint         # Run linters
+make test         # Run tests
+make qa           # Full QA suite
+make build        # Build Docker image
+make deploy       # Deploy to Fly.io
+```
 
 ## License
 

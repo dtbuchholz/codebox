@@ -2,6 +2,9 @@
 # Install: brew install just
 # Usage: just <recipe>
 
+# Configuration
+app_name := env_var_or_default("APP_NAME", "agent-box")
+
 # Default recipe - show help
 default:
     @just --list
@@ -68,7 +71,7 @@ lint-go:
 # Lint shell scripts
 lint-shell:
     @echo "Linting shell scripts..."
-    shellcheck -e SC1091 scripts/* hooks/*.sh config/*.sh
+    shellcheck -e SC1091 scripts/* config/*.sh config/git-hooks/*
 
 # Lint Dockerfile
 lint-docker:
@@ -108,7 +111,7 @@ test:
 # Build Docker image
 build:
     @echo "Building Docker image..."
-    docker build -t agent-box:local .
+    docker build -t {{app_name}}:local .
 
 # Deploy to Fly.io (runs checks first)
 deploy: check
@@ -124,26 +127,26 @@ deploy-force:
 
 # View Fly.io logs
 logs:
-    fly logs -a agent-box
+    fly logs -a {{app_name}}
 
 # Check machine status
 status:
-    fly status -a agent-box
+    fly status -a {{app_name}}
 
 # Open Fly console
 console:
-    fly ssh console -a agent-box
+    fly ssh console -a {{app_name}}
 
 # SSH into the machine via Tailscale
 ssh:
     #!/usr/bin/env bash
     echo "Getting Tailscale IP..."
-    IP=$(fly ssh console -a agent-box -C 'tailscale ip -4' 2>/dev/null | tr -d '\r\n')
+    IP=$(fly ssh console -a {{app_name}} -C 'tailscale ip -4' 2>/dev/null | tr -d '\r\n')
     if [ -n "$IP" ]; then
         echo "Connecting to $IP:2222..."
         ssh -p 2222 agent@$IP
     else
-        echo "Could not get Tailscale IP. Try: fly ssh console -a agent-box"
+        echo "Could not get Tailscale IP. Try: fly ssh console -a {{app_name}}"
     fi
 
 # =============================================================================
@@ -152,7 +155,7 @@ ssh:
 
 # Build dev image
 dev-build:
-    docker build -t agent-box:dev .
+    docker build -t {{app_name}}:dev .
 
 # Run dev container
 dev-run:
@@ -162,7 +165,7 @@ dev-run:
         -p 8080:8080 \
         -v $(pwd)/data:/data \
         -e AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub 2>/dev/null || cat ~/.ssh/id_rsa.pub)" \
-        agent-box:dev
+        {{app_name}}:dev
 
 # =============================================================================
 # Cleanup
@@ -171,7 +174,7 @@ dev-run:
 # Remove build artifacts
 clean:
     rm -f webhook/webhook-receiver
-    docker rmi agent-box:local agent-box:dev 2>/dev/null || true
+    docker rmi {{app_name}}:local {{app_name}}:dev 2>/dev/null || true
     rm -rf webhook/.golangci-lint-cache
 
 # Deep clean (includes caches)

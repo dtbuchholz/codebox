@@ -118,7 +118,7 @@ lint-go:
 
 lint-shell:
 	@echo "Linting shell scripts..."
-	@shellcheck -e SC1091 scripts/* hooks/*.sh config/*.sh
+	@shellcheck -e SC1091 scripts/* config/*.sh config/git-hooks/*
 
 lint-docker:
 	@echo "Linting Dockerfile..."

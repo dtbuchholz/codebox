@@ -4,45 +4,25 @@ Configuration for AI assistants working on this codebase.
 
 ## Project Overview
 
-**Agent Box** - Remote Claude Code environment on Fly.io with tmux sessions, Tailscale access, and Telegram integration. Run long-lived AI coding agents in the cloud, reconnect from anywhere (including iOS), and interact via Telegram with Takopi.
-
-## Tech Stack
-
-- **Go 1.22+**: Webhook receiver (`webhook/`)
-- **Shell (Bash)**: Agent lifecycle scripts, hooks, entrypoint
-- **Docker**: Multi-stage build for Fly.io deployment
-- **Fly.io**: Cloud platform with persistent volumes
-- **Tailscale**: Private network access (no public SSH)
-- **Takopi**: Telegram bot for Claude interaction
-- **just**: Task runner (alternative to Make)
-- **Prettier**: Formatting for MD/JSON/YAML
+**Agent Box** - Remote Claude Code environment on Fly.io. See [README.md](./README.md) for full documentation, architecture, and setup instructions.
 
 ## Quick Commands
 
-Using `just` (recommended) or `make`:
-
 ```bash
-# First-time setup (installs tools + git hooks)
-just setup        # or: make setup
-./scripts/bootstrap.sh  # For fresh VMs
-
 # Quality checks
-just check        # Full QA: lint + test + build
-just lint         # Run all linters
-just format       # Auto-format code
-just test         # Run tests
+make lint         # Run all linters
+make test         # Run tests
+make qa           # Full QA: lint + test + build
 
 # Build & Deploy
-just build        # Build Docker image locally
-just deploy       # Deploy to Fly.io
+make build        # Build Docker image
+make deploy       # Deploy to Fly.io
 
-# Operations
-just status       # Check Fly machine status
-just logs         # View Fly logs
-just ssh          # SSH into the machine
+# Or use just (alternative)
+just check        # Same as make qa
 ```
 
-## Architecture
+## Repository Structure
 
 ```
 codebox/
@@ -51,23 +31,22 @@ codebox/
 │   ├── go.mod
 │   └── .golangci.yml     # Go linter config
 ├── scripts/              # Agent lifecycle CLI tools
-│   ├── cc-new            # Create new agent (supports @project/branch)
+│   ├── cc-new            # Create new agent
 │   ├── cc-stop           # Stop agent
 │   ├── cc-ls             # List running agents
 │   ├── cc-attach         # Attach to agent session
 │   ├── config.sh         # TOML config utilities
-│   ├── healthcheck.sh    # Service monitoring and auto-restart
+│   ├── healthcheck.sh    # Service monitoring
 │   ├── vm-setup.sh       # Interactive VM setup wizard
 │   └── bootstrap.sh      # Fresh VM setup script
 ├── config/               # Container configuration
-│   ├── entrypoint.sh     # Container startup (tailscale, sshd, webhook)
-│   ├── agentbox.toml.example # Agent box configuration template
-│   └── takopi.toml.example   # Takopi (Telegram bot) template
-├── justfile              # Task runner (alternative to Makefile)
+│   ├── entrypoint.sh     # Container startup
+│   ├── git-hooks/        # Git hooks (pre-push)
+│   └── *.example         # Config templates
 ├── Makefile              # Build/deploy commands
+├── justfile              # Alternative task runner
 ├── Dockerfile            # Multi-stage build
-├── fly.toml              # Fly.io deployment config
-└── package.json          # Node deps (Prettier)
+└── fly.toml.example      # Fly.io config template
 ```
 
 ## Code Style
@@ -76,7 +55,6 @@ codebox/
 
 - Standard Go conventions with `golangci-lint`
 - Error handling: always check errors, use descriptive messages
-- Naming: camelCase, exported names start with uppercase
 - Format with `go fmt` and `goimports`
 
 ### Shell Scripts
@@ -89,7 +67,7 @@ codebox/
 ### Dockerfile
 
 - Multi-stage builds to minimize image size
-- Pin base image versions (e.g., `debian:bookworm-slim`)
+- Pin base image versions
 - Combine RUN commands to reduce layers
 - Use `hadolint` for linting
 
@@ -103,7 +81,7 @@ Automatically run on `git commit`:
 - YAML/JSON/TOML validation
 - Shell script linting (shellcheck)
 - Dockerfile linting (hadolint)
-- Go formatting and linting (golangci-lint)
+- Go formatting and linting
 
 ### Pre-push Hooks
 
@@ -120,49 +98,17 @@ Automatically run on `git push`:
 
 ## Testing
 
-### Go Tests
-
 ```bash
+# Go tests
 cd webhook && go test -v ./...
+
+# Shell script syntax
+bash -n script.sh
+shellcheck script.sh
+
+# Docker build
+make build
 ```
-
-### Shell Script Testing
-
-```bash
-bash -n script.sh      # Syntax check
-shellcheck script.sh   # Lint
-```
-
-### Docker Build
-
-```bash
-make build             # Full build
-make dev-build && make dev-run  # Local testing
-```
-
-## Directory Conventions (On Deployed Machine)
-
-```
-/data/                    # Persistent Fly volume
-├── repos/                # Clone repositories here
-├── worktrees/            # Git worktrees (one per agent/branch)
-├── logs/<agent>/         # Logs per agent
-├── inbox/<agent>.txt     # Reply-from-phone messages
-├── home/agent/           # Persistent home directory
-│   ├── .claude/          # Claude Code config & hooks
-│   └── .ssh/             # SSH authorized_keys
-└── config/
-    ├── authorized_keys   # SSH keys (alternative location)
-    ├── tailscale.state   # Tailscale state
-    └── ssh_host_*        # SSH host keys
-```
-
-## Security Notes
-
-- SSH key auth only (no passwords)
-- Tailscale-only network access (no public ports)
-- Webhook auth token optional but recommended
-- Secrets via Fly.io secrets, not env files
 
 ---
 
@@ -188,7 +134,7 @@ make build
 
 **On Failure:**
 
-- For Go lint errors: run `make format-go`
+- For Go lint errors: run `make format`
 - For shell errors: fix shellcheck warnings manually
 - For test failures: investigate and fix
 
