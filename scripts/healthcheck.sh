@@ -125,6 +125,7 @@ check_memory() {
 
 start_takopi() {
     local takopi_config="$AGENT_HOME/.takopi/takopi.toml"
+    local takopi_lock="$AGENT_HOME/.takopi/takopi.lock"
 
     if [ ! -f "$takopi_config" ]; then
         log "Cannot start Takopi: no config file"
@@ -136,6 +137,14 @@ start_takopi() {
         if [ ! -x "$AGENT_HOME/.local/bin/takopi" ]; then
             log "Cannot start Takopi: not installed"
             return 1
+        fi
+    fi
+
+    # Remove stale lockfile if it exists but no takopi process is running
+    if [ -f "$takopi_lock" ]; then
+        if ! pgrep -f "takopi" > /dev/null 2>&1; then
+            log "Removing stale Takopi lockfile"
+            rm -f "$takopi_lock"
         fi
     fi
 
