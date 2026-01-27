@@ -102,6 +102,16 @@ else
     NEED_SSH=true
 fi
 
+# SSH commit signing
+GIT_SIGNING=$(git config --global gpg.format 2>/dev/null || echo "")
+if [ "$GIT_SIGNING" = "ssh" ] && [ -f ~/.ssh/allowed_signers ]; then
+    print_success "SSH commit signing configured"
+    NEED_SIGNING=false
+else
+    print_warning "SSH commit signing not configured"
+    NEED_SIGNING=true
+fi
+
 # Takopi
 if [ -f ~/.takopi/takopi.toml ]; then
     print_success "Takopi config exists"
@@ -162,6 +172,51 @@ if [ "$NEED_SSH" = true ]; then
         read -r
     else
         print_warning "Skipped - add your own key to ~/.ssh/"
+    fi
+fi
+
+# ============================================================================
+# SSH Commit Signing
+# ============================================================================
+if [ "$NEED_SIGNING" = true ] && [ -f ~/.ssh/id_ed25519.pub ]; then
+    print_header "SSH Commit Signing"
+    echo "SSH signing creates verified commits on GitHub without GPG complexity."
+    echo ""
+
+    if ask_yes_no "Enable SSH commit signing?"; then
+        # Get email for allowed_signers
+        signing_email=$(git config --global user.email 2>/dev/null || echo "")
+        if [ -z "$signing_email" ]; then
+            read -r -p "Email for signing (same as git email): " signing_email
+        fi
+
+        if [ -n "$signing_email" ]; then
+            # Configure git for SSH signing
+            git config --global gpg.format ssh
+            git config --global user.signingkey ~/.ssh/id_ed25519.pub
+            git config --global commit.gpgsign true
+            git config --global tag.gpgsign true
+
+            # Create allowed_signers file for verification
+            mkdir -p ~/.ssh
+            echo "$signing_email $(cat ~/.ssh/id_ed25519.pub)" > ~/.ssh/allowed_signers
+            git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+
+            print_success "SSH signing configured"
+            echo ""
+            echo -e "${YELLOW}IMPORTANT:${NC} Add this key to GitHub as a ${BOLD}Signing Key${NC}:"
+            echo "  https://github.com/settings/ssh/new"
+            echo "  Key type: ${BOLD}Signing Key${NC} (not Authentication Key)"
+            echo ""
+            cat ~/.ssh/id_ed25519.pub
+            echo ""
+            echo "Press Enter after adding the signing key to GitHub..."
+            read -r
+        else
+            print_warning "Skipped - no email provided"
+        fi
+    else
+        print_warning "Skipped - commits will not be signed"
     fi
 fi
 
@@ -252,6 +307,13 @@ if [ -f ~/.ssh/id_ed25519.pub ]; then
     print_success "SSH key: exists"
 else
     print_error "SSH key: missing - run: ssh-keygen -t ed25519"
+fi
+
+GIT_SIGNING=$(git config --global gpg.format 2>/dev/null || echo "")
+if [ "$GIT_SIGNING" = "ssh" ]; then
+    print_success "Commit signing: SSH"
+else
+    print_warning "Commit signing: disabled - re-run vm-setup to enable"
 fi
 
 if [ -f ~/.takopi/takopi.toml ]; then

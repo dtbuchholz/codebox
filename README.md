@@ -349,8 +349,41 @@ ENABLE_HEALTHCHECK=0
 
 - **Tailscale-only access**: No public ports exposed
 - **SSH key auth only**: Password auth disabled
+- **Signed commits**: SSH signing for verified commits
 - **Protected branches**: Claude Code blocked from pushing to main/master
 - **Non-root user**: Agents run as `agent` user
+
+### SSH Commit Signing
+
+Agent Box uses SSH keys for commit signing (Git 2.34+). This creates "Verified" commits on GitHub without GPG complexity.
+
+**Setup via wizard:**
+
+```bash
+vm-setup   # Prompts to enable SSH signing
+```
+
+**Manual setup:**
+
+```bash
+# Configure git to use SSH signing
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+
+# Create allowed_signers file
+echo "your@email.com $(cat ~/.ssh/id_ed25519.pub)" > ~/.ssh/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+```
+
+**Add signing key to GitHub:**
+
+1. Go to https://github.com/settings/ssh/new
+2. Select **Signing Key** (not Authentication Key)
+3. Paste your public key (`~/.ssh/id_ed25519.pub`)
+
+> **Note:** The same SSH key can be added twice to GitHub - once as Authentication Key and once as Signing Key.
 
 ### Branch Protection
 
