@@ -31,8 +31,13 @@ primary_region = "{{REGION}}"
 
 # Machine configuration
 [[vm]]
-  size = "shared-cpu-2x"
-  memory = "4gb"
+  size = "shared-cpu-4x"
+  memory = "8gb"
+
+# Auto-restart on failure
+[[restart]]
+  policy = "always"
+  max_retries = 3
 
 # Process configuration
 [processes]

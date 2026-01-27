@@ -203,6 +203,22 @@ if [ "$NEED_SIGNING" = true ] && [ -f ~/.ssh/id_ed25519.pub ]; then
             git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
 
             print_success "SSH signing configured"
+
+            # Set GIT_AUTHOR/COMMITTER env vars for Claude Code (API key auth)
+            # Without these, Claude Code defaults to claude@anthropic.com as author
+            if ! grep -q "GIT_AUTHOR_NAME" ~/.bashrc 2>/dev/null; then
+                git_name=$(git config --global user.name)
+                cat >> ~/.bashrc << EOF
+
+# Git author/committer for Claude Code (required for verified commits with API key auth)
+export GIT_AUTHOR_NAME="$git_name"
+export GIT_AUTHOR_EMAIL="$signing_email"
+export GIT_COMMITTER_NAME="$git_name"
+export GIT_COMMITTER_EMAIL="$signing_email"
+EOF
+                print_success "Git author env vars added to ~/.bashrc"
+            fi
+
             echo ""
             echo -e "${YELLOW}IMPORTANT:${NC} Add this key to GitHub as a ${BOLD}Signing Key${NC}:"
             echo "  https://github.com/settings/ssh/new"

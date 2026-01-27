@@ -59,6 +59,16 @@ Run these on your laptop/desktop.
 - [Tailscale account](https://tailscale.com)
 - SSH key pair
 
+**Recommended VM specs:**
+
+| Resource | Minimum       | Recommended   |
+| -------- | ------------- | ------------- |
+| CPU      | shared-cpu-2x | shared-cpu-4x |
+| Memory   | 4 GB          | 8 GB          |
+| Volume   | 10 GB         | 10 GB+        |
+
+The defaults in `fly.toml.example` use minimum specs. For running multiple agents or larger codebases, increase to recommended specs by editing `fly.toml` after generation.
+
 ```bash
 # Clone and initialize
 git clone https://github.com/your-org/codebox.git
@@ -375,7 +385,18 @@ git config --global tag.gpgsign true
 # Create allowed_signers file
 echo "your@email.com $(cat ~/.ssh/id_ed25519.pub)" > ~/.ssh/allowed_signers
 git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+
+# Set author env vars (required for Claude Code with API key auth)
+cat >> ~/.bashrc << 'EOF'
+export GIT_AUTHOR_NAME="Your Name"
+export GIT_AUTHOR_EMAIL="your@email.com"
+export GIT_COMMITTER_NAME="Your Name"
+export GIT_COMMITTER_EMAIL="your@email.com"
+EOF
+source ~/.bashrc
 ```
+
+> **Why the env vars?** When using API key auth (not OAuth), Claude Code doesn't know your identity and defaults to `claude@anthropic.com` as the commit author. These env vars ensure commits use your identity.
 
 **Add signing key to GitHub:**
 
