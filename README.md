@@ -254,6 +254,7 @@ Set via `fly secrets set`:
 | `TAILSCALE_AUTHKEY`  | Tailscale auth key              | Yes             |
 | `AUTHORIZED_KEYS`    | SSH public keys                 | Yes             |
 | `ANTHROPIC_API_KEY`  | Claude API key                  | No              |
+| `OPENAI_API_KEY`     | For Takopi voice transcription  | No              |
 | `WEBHOOK_AUTH_TOKEN` | Webhook auth token              | No              |
 | `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync | No              |
 | `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot | No (default: 1) |
@@ -469,7 +470,13 @@ cat ~/.takopi/takopi.toml  # Check config
 takopi --verbose           # Debug mode
 ```
 
-**Voice not working:** Ensure `OPENAI_API_KEY` is set in `~/.bashrc`
+**Voice not working:** Set OpenAI API key via Fly secrets:
+
+```bash
+fly secrets set OPENAI_API_KEY="sk-..."
+```
+
+The machine restarts automatically to pick up new secrets.
 
 ### Agent Issues
 
