@@ -1,0 +1,186 @@
+#!/bin/bash
+# init-admin - Initialize the _admin orchestrator project
+#
+# Run this in /data/repos to create a general-purpose workspace
+# for VM-wide tasks like cloning repos, system management, etc.
+#
+# Usage: init-admin
+
+set -e
+
+ADMIN_DIR="/data/repos/_admin"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}!${NC} $1"
+}
+
+# Check we're in /data/repos or allow override
+if [ "$(pwd)" != "/data/repos" ] && [ "$1" != "--force" ]; then
+    echo "Run this from /data/repos or use --force"
+    echo "Usage: cd /data/repos && init-admin"
+    exit 1
+fi
+
+# Create directory
+if [ -d "$ADMIN_DIR" ]; then
+    print_warning "_admin directory already exists"
+else
+    mkdir -p "$ADMIN_DIR"
+    print_success "Created $ADMIN_DIR"
+fi
+
+cd "$ADMIN_DIR"
+
+# Initialize git repo
+if [ -d ".git" ]; then
+    print_warning "Git repo already initialized"
+else
+    git init -q
+    print_success "Initialized git repo"
+fi
+
+# Create CLAUDE.md
+cat > CLAUDE.md << 'CLAUDE_EOF'
+# Admin / Orchestrator Agent
+
+General-purpose workspace for VM-wide tasks. This agent can manage repos, create other agents, and handle tasks that span multiple projects.
+
+## Capabilities
+
+### Repo Management
+
+```bash
+# Clone a new repo
+cd /data/repos && git clone git@github.com:org/repo.git
+
+# Or via HTTPS (if gh auth is configured)
+cd /data/repos && git clone https://github.com/org/repo.git
+```
+
+### Agent Management
+
+```bash
+cc-ls                                    # List running agents
+cc-new <name> /data/repos/<project>      # Create new agent
+cc-new <name> @<project>/<branch>        # Create agent with worktree
+cc-stop <name>                           # Stop an agent
+cc-attach <name>                         # Attach to agent (from SSH)
+```
+
+### Takopi Management
+
+```bash
+takopi-add-project <name>                # Add project to Takopi config
+takopi-restart                           # Restart Takopi bot
+```
+
+### System Info
+
+```bash
+df -h /data                              # Check disk space
+du -sh /data/repos/*                     # Repo sizes
+cc-ls                                    # Running agents
+tailscale status                         # Network status
+```
+
+## Project Locations
+
+All repos live in `/data/repos/`:
+
+```bash
+ls -la /data/repos/
+```
+
+## Guidelines
+
+- Clone repos into `/data/repos/<repo-name>`
+- After cloning, run `takopi-add-project <name>` to enable Telegram access
+- For project-specific work, suggest the user switch to that project's Telegram topic
+- Don't modify files in other projects unless explicitly asked
+- This workspace is for orchestration, not deep coding tasks
+
+## Common Tasks
+
+### Set up a new project
+
+```bash
+cd /data/repos
+git clone git@github.com:org/new-repo.git
+takopi-add-project new-repo
+# Then in Telegram: create topic "new-repo" and run /ctx set new-repo
+```
+
+### Check VM health
+
+```bash
+df -h /data                              # Disk space
+free -h                                  # Memory
+cc-ls                                    # Running agents
+tail -20 /data/logs/healthcheck.log      # Health monitor
+```
+
+### Clean up disk space
+
+```bash
+pnpm store prune                         # Clean pnpm cache
+rm -rf ~/.cache/ms-playwright            # Remove Playwright
+npm cache clean --force                  # Clean npm cache
+```
+CLAUDE_EOF
+
+print_success "Created CLAUDE.md"
+
+# Create .gitignore
+cat > .gitignore << 'GITIGNORE_EOF'
+# Local files
+*.log
+*.tmp
+.DS_Store
+
+# Secrets
+.env
+*.key
+GITIGNORE_EOF
+
+print_success "Created .gitignore"
+
+# Initial commit
+if ! git rev-parse HEAD &>/dev/null 2>&1; then
+    git add -A
+    git commit -q -m "Initial commit: orchestrator workspace"
+    print_success "Created initial commit"
+else
+    print_warning "Repo already has commits"
+fi
+
+# Add to Takopi if available
+if command -v takopi-add-project &>/dev/null; then
+    if takopi-add-project _admin 2>/dev/null; then
+        print_success "Added _admin to Takopi config"
+    else
+        print_warning "Could not add to Takopi (may already exist)"
+    fi
+else
+    print_warning "takopi-add-project not found - add manually later"
+fi
+
+echo ""
+echo "Setup complete!"
+echo ""
+echo "Next steps:"
+echo "  1. In Telegram, go to your General topic (or create an 'admin' topic)"
+echo "  2. Run: /ctx set _admin"
+echo "  3. Start using it for general VM tasks"
+echo ""
+echo "Optional: Add a remote later:"
+echo "  git remote add origin git@github.com:your-org/vm-admin.git"
+echo "  git push -u origin main"

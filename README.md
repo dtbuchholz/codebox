@@ -166,8 +166,20 @@ cc-attach myproject
 | `cc-stop <name>`                | Stop an agent                  |
 | `cc-stop --all`                 | Stop all agents                |
 | `vm-setup`                      | Interactive setup wizard       |
+| `init-admin`                    | Create orchestrator workspace  |
 | `takopi-restart`                | Restart Takopi bot             |
 | `takopi-add-project <name>`     | Add project to Takopi config   |
+
+### Orchestrator Workspace
+
+For general VM tasks (cloning repos, system management), create an orchestrator workspace:
+
+```bash
+cd /data/repos
+init-admin
+```
+
+This creates `/data/repos/_admin` with a CLAUDE.md tailored for VM-wide tasks. Map it to your Telegram "General" topic via `/ctx set _admin`.
 
 ## Communication Options
 
