@@ -4,7 +4,9 @@
 # Run this in /data/repos to create a general-purpose workspace
 # for VM-wide tasks like cloning repos, system management, etc.
 #
-# Usage: init-admin
+# Safe to run multiple times - only creates missing files.
+#
+# Usage: init-admin [--force]
 
 set -e
 
@@ -23,8 +25,8 @@ print_warning() {
     echo -e "${YELLOW}!${NC} $1"
 }
 
-# Check we're in /data/repos or allow override
-if [ "$(pwd)" != "/data/repos" ] && [ "$1" != "--force" ]; then
+# Check we're in /data/repos or the admin dir itself, or allow override
+if [ "$(pwd)" != "/data/repos" ] && [ "$(pwd)" != "$ADMIN_DIR" ] && [ "$1" != "--force" ]; then
     echo "Run this from /data/repos or use --force"
     echo "Usage: cd /data/repos && init-admin"
     exit 1
@@ -48,11 +50,23 @@ else
     print_success "Initialized git repo"
 fi
 
-# Create CLAUDE.md
-cat > CLAUDE.md << 'CLAUDE_EOF'
+# Create CLAUDE.md (only if missing)
+if [ -f "CLAUDE.md" ]; then
+    print_warning "CLAUDE.md already exists (skipping)"
+else
+    cat > CLAUDE.md << 'CLAUDE_EOF'
 # Admin / Orchestrator Agent
 
 General-purpose workspace for VM-wide tasks. This agent can manage repos, create other agents, and handle tasks that span multiple projects.
+
+## Important: Read NOTES.md First
+
+Before starting any task, read `NOTES.md` for:
+- List of repos on this VM and their purposes
+- Learnings and gotchas discovered over time
+- Common tasks and how to do them
+
+**Update NOTES.md** when you learn something new or complete a significant task.
 
 ## Capabilities
 
@@ -107,6 +121,7 @@ ls -la /data/repos/
 - For project-specific work, suggest the user switch to that project's Telegram topic
 - Don't modify files in other projects unless explicitly asked
 - This workspace is for orchestration, not deep coding tasks
+- **Always update NOTES.md** with new learnings
 
 ## Common Tasks
 
@@ -118,6 +133,8 @@ git clone git@github.com:org/new-repo.git
 takopi-add-project new-repo
 # Then in Telegram: create topic "new-repo" and run /ctx set new-repo
 ```
+
+After setup, add the project to NOTES.md under "Repos on this VM".
 
 ### Check VM health
 
@@ -136,11 +153,65 @@ rm -rf ~/.cache/ms-playwright            # Remove Playwright
 npm cache clean --force                  # Clean npm cache
 ```
 CLAUDE_EOF
+    print_success "Created CLAUDE.md"
+fi
 
-print_success "Created CLAUDE.md"
+# Create NOTES.md (only if missing)
+if [ -f "NOTES.md" ]; then
+    print_warning "NOTES.md already exists (skipping)"
+else
+    cat > NOTES.md << 'NOTES_EOF'
+# Admin Notes
 
-# Create .gitignore
-cat > .gitignore << 'GITIGNORE_EOF'
+Cross-session memory for the orchestrator agent. Update this file when you learn something new.
+
+## Repos on this VM
+
+<!-- List repos with brief descriptions. Update when adding new repos. -->
+
+| Repo | Description | Notes |
+|------|-------------|-------|
+| admin | This orchestrator workspace | General VM tasks |
+
+## Learnings & Gotchas
+
+<!-- Things discovered that should be remembered across sessions -->
+
+- Takopi project names cannot start with underscore
+- OPENAI_API_KEY required for voice transcription in Telegram
+- pnpm store can grow to 5GB+, prune with `pnpm store prune`
+- Default volume is 10GB, extend with `fly volumes extend`
+
+## Common Workflows
+
+<!-- Document repeated tasks for quick reference -->
+
+### New Repo Setup
+1. `cd /data/repos && git clone <url>`
+2. `takopi-add-project <name>`
+3. Create Telegram topic, run `/ctx set <name>`
+4. Update this file's "Repos on this VM" table
+
+### Disk Space Low
+1. `df -h /data` to check usage
+2. `du -sh /data/repos/*` for repo sizes
+3. `pnpm store prune` to clean pnpm
+4. `rm -rf ~/.cache/ms-playwright` if not needed
+
+## Pending Tasks
+
+<!-- Optional: track cross-session todos -->
+
+- [ ] Example: Set up monitoring for X
+NOTES_EOF
+    print_success "Created NOTES.md"
+fi
+
+# Create .gitignore (only if missing)
+if [ -f ".gitignore" ]; then
+    print_warning ".gitignore already exists (skipping)"
+else
+    cat > .gitignore << 'GITIGNORE_EOF'
 # Local files
 *.log
 *.tmp
@@ -150,16 +221,16 @@ cat > .gitignore << 'GITIGNORE_EOF'
 .env
 *.key
 GITIGNORE_EOF
+    print_success "Created .gitignore"
+fi
 
-print_success "Created .gitignore"
-
-# Initial commit
-if ! git rev-parse HEAD &>/dev/null 2>&1; then
+# Commit any new files
+if [ -n "$(git status --porcelain)" ]; then
     git add -A
-    git commit -q -m "Initial commit: orchestrator workspace"
-    print_success "Created initial commit"
+    git commit -q -m "Update orchestrator workspace"
+    print_success "Committed new files"
 else
-    print_warning "Repo already has commits"
+    print_warning "No new files to commit"
 fi
 
 # Add to Takopi if available
@@ -175,6 +246,10 @@ fi
 
 echo ""
 echo "Setup complete!"
+echo ""
+echo "Files:"
+echo "  - CLAUDE.md: Instructions for the orchestrator agent"
+echo "  - NOTES.md:  Cross-session memory (update this regularly)"
 echo ""
 echo "Next steps:"
 echo "  1. In Telegram, go to your General topic (or create an 'admin' topic)"
