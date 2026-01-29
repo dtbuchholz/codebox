@@ -179,7 +179,7 @@ cd /data/repos
 init-admin
 ```
 
-This creates `/data/repos/_admin` with a CLAUDE.md tailored for VM-wide tasks. Map it to your Telegram "General" topic via `/ctx set _admin`.
+This creates `/data/repos/admin` with a CLAUDE.md tailored for VM-wide tasks. Map it to your Telegram "General" topic via `/ctx set admin`.
 
 ## Communication Options
 

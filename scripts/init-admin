@@ -1,5 +1,5 @@
 #!/bin/bash
-# init-admin - Initialize the _admin orchestrator project
+# init-admin - Initialize the admin orchestrator project
 #
 # Run this in /data/repos to create a general-purpose workspace
 # for VM-wide tasks like cloning repos, system management, etc.
@@ -8,7 +8,7 @@
 
 set -e
 
-ADMIN_DIR="/data/repos/_admin"
+ADMIN_DIR="/data/repos/admin"
 
 # Colors
 GREEN='\033[0;32m'
@@ -32,7 +32,7 @@ fi
 
 # Create directory
 if [ -d "$ADMIN_DIR" ]; then
-    print_warning "_admin directory already exists"
+    print_warning "admin directory already exists"
 else
     mkdir -p "$ADMIN_DIR"
     print_success "Created $ADMIN_DIR"
@@ -164,8 +164,8 @@ fi
 
 # Add to Takopi if available
 if command -v takopi-add-project &>/dev/null; then
-    if takopi-add-project _admin 2>/dev/null; then
-        print_success "Added _admin to Takopi config"
+    if takopi-add-project admin 2>/dev/null; then
+        print_success "Added admin to Takopi config"
     else
         print_warning "Could not add to Takopi (may already exist)"
     fi
@@ -178,7 +178,7 @@ echo "Setup complete!"
 echo ""
 echo "Next steps:"
 echo "  1. In Telegram, go to your General topic (or create an 'admin' topic)"
-echo "  2. Run: /ctx set _admin"
+echo "  2. Run: /ctx set admin"
 echo "  3. Start using it for general VM tasks"
 echo ""
 echo "Optional: Add a remote later:"
