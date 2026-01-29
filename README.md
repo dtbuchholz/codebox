@@ -501,6 +501,44 @@ takopi-restart
 2. Set `use_api_billing = true` in `~/.takopi/takopi.toml`
 3. Run `takopi-restart`
 
+### Disk Space Issues
+
+**"No space left on device" errors:**
+
+The default 10GB volume can fill up quickly with JS projects. Check usage:
+
+```bash
+df -h /data                                    # Overall usage
+du -sh /data/repos/*                           # Repo sizes
+du -sh /data/home/agent/.local/share/* 2>/dev/null | sort -h  # Caches
+```
+
+**Common space hogs:**
+
+| Location                 | Typical Size | Description                    |
+| ------------------------ | ------------ | ------------------------------ |
+| `~/.local/share/pnpm`    | 2-5GB        | pnpm content-addressable store |
+| `~/.cache/ms-playwright` | 900MB        | Browser binaries for E2E tests |
+| `~/.local/share/uv`      | 200-500MB    | Python environments (Takopi)   |
+| `/data/swapfile`         | 2GB          | Swap file (do not delete)      |
+
+**Cleanup commands:**
+
+```bash
+pnpm store prune                   # Remove unused pnpm packages
+rm -rf ~/.cache/ms-playwright      # Remove Playwright browsers
+rm -rf ~/.cache/node-gyp           # Remove node-gyp cache
+npm cache clean --force            # Clear npm cache
+```
+
+**Extend volume (from local machine):**
+
+```bash
+fly volumes list -a <app-name>
+fly volumes extend <vol-id> -s 20  # Extend to 20GB ($0.15/GB/month)
+fly machines restart <machine-id>  # Restart to resize filesystem
+```
+
 ### Performance Issues
 
 **VM freezes during heavy operations:**
