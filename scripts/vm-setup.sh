@@ -249,9 +249,16 @@ if [ "$NEED_GH" = true ]; then
         echo "Choose 'GitHub.com', 'HTTPS', and 'Login with a web browser' or 'Paste token'"
         echo ""
         gh auth login
-        print_success "GitHub CLI authenticated"
+        # Configure git to use gh for HTTPS authentication
+        gh auth setup-git
+        print_success "GitHub CLI authenticated + git credential helper configured"
     else
         print_warning "Skipped - run 'gh auth login' later"
+    fi
+else
+    # Even if already authenticated, ensure git credential helper is configured
+    if ! git config --global credential.helper 2>/dev/null | grep -q "gh"; then
+        gh auth setup-git 2>/dev/null && print_success "Git credential helper configured for gh"
     fi
 fi
 
