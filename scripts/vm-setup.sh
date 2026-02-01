@@ -296,6 +296,26 @@ if [ "$NEED_TAKOPI" = true ]; then
             echo ""
             echo "Running Takopi setup wizard..."
             takopi
+
+            # Configure file uploads after wizard completes
+            if [ -f ~/.takopi/takopi.toml ]; then
+                echo ""
+                echo "Configuring file uploads..."
+
+                # Extract chat_id from config
+                chat_id=$(grep -E "^chat_id\s*=" ~/.takopi/takopi.toml | head -1 | sed 's/.*=\s*//' | tr -d ' ')
+
+                if [ -n "$chat_id" ] && [ "$chat_id" != "0" ]; then
+                    takopi config set "transports.telegram.files.enabled" "true"
+                    takopi config set "transports.telegram.files.auto_put" "true"
+                    takopi config set "transports.telegram.files.uploads_dir" "incoming"
+                    takopi config set "transports.telegram.files.allowed_user_ids" "[$chat_id]"
+                    takopi config set "transports.telegram.files.deny_globs" '[".git/**", ".env", ".envrc", "**/*.pem", "**/.ssh/**", "**/secrets/**"]'
+                    print_success "File uploads enabled for chat_id $chat_id"
+                else
+                    print_warning "Could not detect chat_id - file uploads may need manual config"
+                fi
+            fi
         else
             print_warning "Install takopi manually: uv tool install takopi"
         fi

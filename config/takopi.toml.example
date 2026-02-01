@@ -73,6 +73,14 @@ enabled = true
 auto_put = true
 uploads_dir = "incoming"
 
+# Which users can upload files. Empty = private chats only (no groups).
+# To allow all users in your chat, add your chat_id here.
+# Get your chat_id by messaging the bot - it will tell you on first message.
+allowed_user_ids = []  # e.g., [123456789] or [123456789, 987654321]
+
+# Block dangerous file patterns from being fetched/downloaded
+deny_globs = [".git/**", ".env", ".envrc", "**/*.pem", "**/.ssh/**", "**/secrets/**"]
+
 # =============================================================================
 # Project Configuration
 # =============================================================================
