@@ -136,6 +136,29 @@ source ~/.bashrc
 claude   # then use /login
 ```
 
+**Codex CLI authentication** (if using Codex):
+
+```bash
+# Option A: Fly secrets (recommended)
+fly secrets set OPENAI_API_KEY="sk-..."
+
+# Option B: Interactive login
+codex   # then sign in with ChatGPT account or API key
+```
+
+For OpenRouter or custom endpoints, configure `~/.codex/config.toml`:
+
+```toml
+model = "anthropic/claude-sonnet-4"
+model_provider = "openrouter"
+
+[model_providers.openrouter]
+base_url = "https://openrouter.ai/api/v1"
+env_key = "OPENROUTER_API_KEY"
+```
+
+Or set `OPENAI_BASE_URL` to point to your proxy.
+
 ### Phase 3: Start Using Agents
 
 ```bash
@@ -156,19 +179,52 @@ cc-attach myproject
 
 ## Agent Commands
 
-| Command                         | Description                    |
-| ------------------------------- | ------------------------------ |
-| `cc-new <name> <dir>`           | Create agent in directory      |
-| `cc-new <name> @project/branch` | Create agent with git worktree |
-| `cc-new <name> <dir> --attach`  | Create and attach immediately  |
-| `cc-ls`                         | List all running agents        |
-| `cc-attach <name>`              | Attach to existing agent       |
-| `cc-stop <name>`                | Stop an agent                  |
-| `cc-stop --all`                 | Stop all agents                |
-| `vm-setup`                      | Interactive setup wizard       |
-| `init-admin`                    | Create orchestrator workspace  |
-| `takopi-restart`                | Restart Takopi bot             |
-| `takopi-add-project <name>`     | Add project to Takopi config   |
+| Command                          | Description                    |
+| -------------------------------- | ------------------------------ |
+| `cc-new <name> <dir>`            | Create agent in directory      |
+| `cc-new <name> @project/branch`  | Create agent with git worktree |
+| `cc-new <name> <dir> --attach`   | Create and attach immediately  |
+| `cc-new <name> <dir> --type codex` | Create agent using Codex CLI |
+| `cc-ls`                          | List all running agents        |
+| `cc-attach <name>`               | Attach to existing agent       |
+| `cc-stop <name>`                 | Stop an agent                  |
+| `cc-stop --all`                  | Stop all agents                |
+| `vm-setup`                       | Interactive setup wizard       |
+| `init-admin`                     | Create orchestrator workspace  |
+| `takopi-restart`                 | Restart Takopi bot             |
+| `takopi-add-project <name>`      | Add project to Takopi config   |
+
+### Multiple Agent Engines
+
+Agent Box supports both Claude Code and OpenAI Codex CLI. Use `--type` to select:
+
+```bash
+# Default (Claude Code)
+cc-new myproject /data/repos/myproject
+
+# Use Codex CLI
+cc-new myproject /data/repos/myproject --type codex
+
+# cc-ls shows the CLI type
+cc-ls
+```
+
+**Via Takopi:** Prefix messages with `/codex` or `/claude` to select the engine:
+
+```
+/codex fix the failing tests
+/claude refactor this function
+```
+
+**Default engine:** Configure in `/data/config/agentbox.toml`:
+
+```toml
+[agent]
+default_cli = "claude"  # or "codex"
+
+[projects.myproject]
+default_cli = "codex"   # per-project override
+```
 
 ### Orchestrator Workspace
 
@@ -261,15 +317,16 @@ Multiple SSH sessions can attach to the same tmux session simultaneously.
 
 Set via `fly secrets set`:
 
-| Variable             | Description                     | Required        |
-| -------------------- | ------------------------------- | --------------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key              | Yes             |
-| `AUTHORIZED_KEYS`    | SSH public keys                 | Yes             |
-| `ANTHROPIC_API_KEY`  | Claude API key                  | No              |
-| `OPENAI_API_KEY`     | For Takopi voice transcription  | No              |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token              | No              |
-| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync | No              |
-| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot | No (default: 1) |
+| Variable             | Description                       | Required        |
+| -------------------- | --------------------------------- | --------------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key                | Yes             |
+| `AUTHORIZED_KEYS`    | SSH public keys                   | Yes             |
+| `ANTHROPIC_API_KEY`  | Claude API key                    | No              |
+| `OPENAI_API_KEY`     | For Codex CLI and voice transcription | No          |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token                | No              |
+| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync   | No              |
+| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot   | No (default: 1) |
+| `AUTO_UPDATE_CODEX`  | Auto-update Codex CLI on boot     | No (default: 1) |
 
 ### VM Environment (`~/.bashrc`)
 
@@ -341,6 +398,7 @@ claude-config/
 | Tool                | Description                            |
 | ------------------- | -------------------------------------- |
 | `claude`            | Claude Code CLI                        |
+| `codex`             | OpenAI Codex CLI                       |
 | `gh`                | GitHub CLI                             |
 | `git`               | Version control                        |
 | `psql`              | PostgreSQL client (server auto-starts) |

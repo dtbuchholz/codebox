@@ -158,6 +158,19 @@ elif [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ]; then
     npm update -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code update check skipped"
 fi
 
+# Install or update OpenAI Codex CLI
+if ! command -v codex &> /dev/null; then
+    echo "Installing OpenAI Codex CLI..."
+    npm install -g @openai/codex || echo "Codex CLI install will complete on first run"
+elif [ "${AUTO_UPDATE_CODEX:-1}" = "1" ]; then
+    echo "Checking for Codex CLI updates..."
+    npm update -g @openai/codex 2>/dev/null || echo "Codex CLI update check skipped"
+fi
+
+# Ensure Codex home directory persists on volume
+mkdir -p /data/.codex
+chown agent:agent /data/.codex
+
 # Ensure Claude Code config directory exists
 mkdir -p "$AGENT_HOME/.claude"
 
@@ -188,6 +201,8 @@ AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
     [ -n "$ANTHROPIC_BASE_URL" ] && echo "export ANTHROPIC_BASE_URL=\"$ANTHROPIC_BASE_URL\""
     [ -n "$OPENAI_API_KEY" ] && echo "export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
     [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
+    # Codex home directory for persistent state
+    echo "export CODEX_HOME=\"/data/.codex\""
 } > "$AGENT_ENV_FILE"
 chown agent:agent "$AGENT_ENV_FILE"
 chmod 600 "$AGENT_ENV_FILE"
