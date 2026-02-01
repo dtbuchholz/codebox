@@ -1,9 +1,10 @@
 #!/bin/bash
-# cc-new - Create a new Claude Code agent in a tmux session
+# cc-new - Create a new coding agent in a tmux session
 #
-# Supports project aliases and git worktrees:
-#   cc-new myagent @myproject           # Use project alias
+# Supports multiple CLI types (claude, codex), project aliases, and git worktrees:
+#   cc-new myagent @myproject           # Use project alias (default: claude)
 #   cc-new myagent @myproject/feature   # Create worktree for branch
+#   cc-new myagent /path --type codex   # Use Codex CLI instead of Claude
 
 set -e
 
@@ -13,9 +14,9 @@ SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/config.sh" 2>/dev/null || true
 
 usage() {
-    echo "Usage: cc-new <agent-name> [directory|@project[/branch]]"
+    echo "Usage: cc-new <agent-name> [directory|@project[/branch]] [options]"
     echo ""
-    echo "Create a new Claude Code agent in a tmux session."
+    echo "Create a new coding agent in a tmux session."
     echo ""
     echo "Arguments:"
     echo "  agent-name   Name for the tmux session (required)"
@@ -24,12 +25,13 @@ usage() {
     echo "    @project/branch Create/use git worktree for branch"
     echo ""
     echo "Options:"
-    echo "  --attach     Auto-attach after creation"
+    echo "  --attach       Auto-attach after creation"
+    echo "  --type TYPE    CLI type: claude (default), codex"
     echo ""
     echo "Examples:"
     echo "  cc-new myproject /data/repos/myproject"
     echo "  cc-new auth @myproject/feature-auth"
-    echo "  cc-new bugfix @myproject"
+    echo "  cc-new bugfix @myproject --type codex"
     echo ""
 
     # Show configured projects if available
@@ -144,6 +146,7 @@ fi
 AGENT_NAME="$1"
 LOCATION="${2:-}"
 AUTO_ATTACH=""
+CLI_TYPE=""
 
 # Parse options
 shift
@@ -152,6 +155,10 @@ while [[ $# -gt 0 ]]; do
         --attach)
             AUTO_ATTACH="1"
             shift
+            ;;
+        --type)
+            CLI_TYPE="$2"
+            shift 2
             ;;
         @*)
             LOCATION="$1"
@@ -210,6 +217,41 @@ fi
 # Create working directory if it doesn't exist
 mkdir -p "$WORK_DIR"
 
+# Determine CLI type (claude or codex)
+if [[ -z "$CLI_TYPE" ]]; then
+    # Check project-specific config first
+    if [[ -n "$PROJECT_ALIAS" ]] && type config_get &>/dev/null; then
+        CLI_TYPE=$(config_get "projects.${PROJECT_ALIAS}.default_cli" "")
+    fi
+    # Fall back to global config
+    if [[ -z "$CLI_TYPE" ]] && type config_get &>/dev/null; then
+        CLI_TYPE=$(config_get "agent.default_cli" "claude")
+    fi
+    # Ultimate default
+    CLI_TYPE="${CLI_TYPE:-claude}"
+fi
+
+# Validate CLI type
+case "$CLI_TYPE" in
+    claude|codex)
+        ;;
+    *)
+        echo "Error: Unknown CLI type '$CLI_TYPE'. Supported: claude, codex"
+        exit 1
+        ;;
+esac
+
+# Validate CLI is installed
+if ! command -v "$CLI_TYPE" &>/dev/null; then
+    echo "Error: $CLI_TYPE is not installed"
+    if [[ "$CLI_TYPE" == "codex" ]]; then
+        echo "Install with: npm install -g @openai/codex"
+    else
+        echo "Install with: npm install -g @anthropic-ai/claude-code"
+    fi
+    exit 1
+fi
+
 # Create log directory for this agent
 LOG_DIR="/data/logs/$AGENT_NAME"
 if type config_get &>/dev/null; then
@@ -228,6 +270,7 @@ mkdir -p "$INBOX_DIR"
 touch "$INBOX_FILE"
 
 echo "Creating agent '$AGENT_NAME'..."
+echo "  CLI type: $CLI_TYPE"
 echo "  Working directory: $WORK_DIR"
 if [[ -n "$PROJECT_ALIAS" ]]; then
     echo "  Project: @$PROJECT_ALIAS"
@@ -251,15 +294,23 @@ fi
 if [[ -n "$BRANCH_NAME" ]]; then
     tmux send-keys -t "$AGENT_NAME" "export AGENT_BRANCH='$BRANCH_NAME'" Enter
 fi
+tmux send-keys -t "$AGENT_NAME" "export AGENT_CLI='$CLI_TYPE'" Enter
 
-# Get Claude args from config
-CLAUDE_ARGS=""
+# Get CLI-specific args from config
+CLI_ARGS=""
 if type config_get &>/dev/null; then
-    CLAUDE_ARGS=$(config_get "agent.claude_args" "")
+    case "$CLI_TYPE" in
+        claude)
+            CLI_ARGS=$(config_get "agent.claude_args" "")
+            ;;
+        codex)
+            CLI_ARGS=$(config_get "agent.codex_args" "")
+            ;;
+    esac
 fi
 
-# Start Claude Code
-tmux send-keys -t "$AGENT_NAME" "clear && echo '=== Agent: $AGENT_NAME ===' && echo 'Directory: $WORK_DIR' && echo '' && claude $CLAUDE_ARGS" Enter
+# Start the coding agent
+tmux send-keys -t "$AGENT_NAME" "clear && echo '=== Agent: $AGENT_NAME ($CLI_TYPE) ===' && echo 'Directory: $WORK_DIR' && echo '' && $CLI_TYPE $CLI_ARGS" Enter
 
 echo ""
 echo "Agent '$AGENT_NAME' created!"

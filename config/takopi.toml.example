@@ -114,5 +114,10 @@ dangerously_skip_permissions = true
 # Additional arguments for Claude Code
 # args = "--allowedTools Edit,Read,Write"
 
-# [codex]
-# model = "gpt-4"
+[codex]
+# Extra CLI arguments for Codex (e.g., "--full-auto" to auto-approve all actions)
+# Note: Codex uses different flags than Claude - see Codex docs for options
+# extra_args = ["--full-auto"]
+
+# Profile name (passed as --profile, used as session title)
+# profile = "default"

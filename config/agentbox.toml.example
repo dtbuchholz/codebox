@@ -57,17 +57,25 @@ allow_inject = true
 path = "/data/repos/myproject"
 worktrees_dir = ".worktrees"
 base_branch = "main"
+# default_cli = "codex"  # Override default CLI for this project
 
 # [projects.another]
 # path = "/data/repos/another-repo"
 # base_branch = "develop"
+# default_cli = "claude"
 
 # =============================================================================
 # Agent Defaults
 # =============================================================================
 [agent]
-# Default Claude Code arguments
+# Default CLI type: "claude" or "codex"
+default_cli = "claude"
+
+# Claude Code arguments
 claude_args = ""
+
+# OpenAI Codex CLI arguments
+codex_args = ""
 
 # Session name prefix
 name_prefix = ""
