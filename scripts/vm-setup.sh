@@ -36,10 +36,10 @@ ask_yes_no() {
     local response
 
     if [ "$default" = "y" ]; then
-        read -p "$prompt [Y/n]: " response
+        read -rp "$prompt [Y/n]: " response
         response="${response:-y}"
     else
-        read -p "$prompt [y/N]: " response
+        read -rp "$prompt [y/N]: " response
         response="${response:-n}"
     fi
 
@@ -124,10 +124,8 @@ fi
 # Claude Code
 if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.env.secrets ]; then
     print_success "Claude API key configured"
-    NEED_CLAUDE=false
 else
     print_warning "Claude API key not set"
-    NEED_CLAUDE=true
 fi
 
 echo ""
@@ -140,8 +138,8 @@ if [ "$NEED_GIT" = true ]; then
     echo "Git needs your name and email for commits."
     echo ""
 
-    read -p "Your name: " git_name
-    read -p "Your email: " git_email
+    read -rp "Your name: " git_name
+    read -rp "Your email: " git_email
 
     if [ -n "$git_name" ] && [ -n "$git_email" ]; then
         git config --global user.name "$git_name"
@@ -284,6 +282,7 @@ if [ "$NEED_TAKOPI" = true ]; then
                 if ! command -v uv &>/dev/null; then
                     echo "Installing uv..."
                     curl -LsSf https://astral.sh/uv/install.sh | sh
+                    # shellcheck source=/dev/null
                     source ~/.bashrc
                 fi
                 uv python install 3.13

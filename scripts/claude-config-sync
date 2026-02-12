@@ -86,7 +86,8 @@ init_repo() {
 
     # Backup existing config if any
     if [ -d "$CLAUDE_DIR" ] && [ "$(ls -A "$CLAUDE_DIR" 2>/dev/null)" ]; then
-        local backup="$CLAUDE_DIR.backup.$(date +%Y%m%d%H%M%S)"
+        local backup
+        backup="$CLAUDE_DIR.backup.$(date +%Y%m%d%H%M%S)"
         log "Backing up existing config to $backup"
         mv "$CLAUDE_DIR" "$backup"
     fi

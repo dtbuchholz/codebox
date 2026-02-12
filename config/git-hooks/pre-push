@@ -9,9 +9,9 @@
 
 PROTECTED_BRANCHES="main master"
 
-while read -r local_ref local_sha remote_ref remote_sha; do
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
     # Extract branch name from ref
-    branch=$(echo "$remote_ref" | sed 's|refs/heads/||')
+    branch="${remote_ref#refs/heads/}"
 
     for protected in $PROTECTED_BRANCHES; do
         if [ "$branch" = "$protected" ]; then

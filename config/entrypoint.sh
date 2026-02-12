@@ -104,7 +104,7 @@ start_postgresql() {
     fi
 
     echo "Starting PostgreSQL..."
-    PG_VERSION=$(ls /etc/postgresql/ 2>/dev/null | head -1)
+    PG_VERSION=$(find /etc/postgresql/ -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | head -1)
     if [ -z "$PG_VERSION" ]; then
         echo "Warning: PostgreSQL installed but no version found"
         return 0

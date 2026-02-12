@@ -26,9 +26,9 @@ type InboxMessage struct {
 }
 
 type Response struct {
-	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 	Error   string `json:"error,omitempty"`
+	Success bool   `json:"success"`
 }
 
 var (
@@ -62,7 +62,7 @@ func main() {
 		log.Println("Auth token configured")
 	}
 
-	if err := os.MkdirAll(inboxDir, 0755); err != nil {
+	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		log.Fatalf("failed to create inbox dir: %v", err)
 	}
 
@@ -80,8 +80,7 @@ func main() {
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{Success: true, Message: "ok"})
+	respondJSON(w, http.StatusOK, Response{Success: true, Message: "ok"})
 }
 
 func checkAuth(w http.ResponseWriter, r *http.Request) bool {
@@ -100,17 +99,13 @@ func checkAuth(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(Response{Success: false, Error: "unauthorized"})
+	respondJSON(w, http.StatusUnauthorized, Response{Success: false, Error: "unauthorized"})
 	return false
 }
 
 func inboxHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(Response{Success: false, Error: "method not allowed"})
+		respondError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -128,9 +123,7 @@ func inboxHandler(w http.ResponseWriter, r *http.Request) {
 func sendHandler(w http.ResponseWriter, r *http.Request) {
 	// Same as inbox but with inject=true by default
 	if r.Method != http.MethodPost {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(Response{Success: false, Error: "method not allowed"})
+		respondError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -147,9 +140,7 @@ func sendHandler(w http.ResponseWriter, r *http.Request) {
 
 func agentsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(Response{Success: false, Error: "method not allowed"})
+		respondError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if !checkAuth(w, r) {
@@ -160,8 +151,7 @@ func agentsHandler(w http.ResponseWriter, r *http.Request) {
 	output, err := tmuxOutput("ls", "-F", "#{session_name}")
 	if err != nil {
 		// No sessions
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"success": true,
 			"agents":  []string{},
 		})
@@ -173,8 +163,7 @@ func agentsHandler(w http.ResponseWriter, r *http.Request) {
 		agents = []string{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"agents":  agents,
 	})
@@ -191,10 +180,16 @@ func injectToTmux(session, message string) error {
 	return tmuxRun("send-keys", "-t", session, message, "Enter")
 }
 
-func respondError(w http.ResponseWriter, msg string, code int) {
+func respondJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(Response{Success: false, Error: msg})
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("Warning: failed to encode response: %v", err)
+	}
+}
+
+func respondError(w http.ResponseWriter, msg string, code int) {
+	respondJSON(w, code, Response{Success: false, Error: msg})
 }
 
 func truncate(s string, n int) string {
@@ -257,12 +252,12 @@ func deliverMessage(w http.ResponseWriter, msg InboxMessage, okMessage string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	entry := fmt.Sprintf("[%s] %s\n", timestamp, msg.Message)
 
-	if err := os.MkdirAll(inboxDir, 0755); err != nil {
+	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		respondError(w, "failed to create inbox directory", http.StatusInternalServerError)
 		return
 	}
 
-	f, err := os.OpenFile(inboxFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(inboxFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		respondError(w, "failed to write to inbox", http.StatusInternalServerError)
 		return
@@ -282,8 +277,7 @@ func deliverMessage(w http.ResponseWriter, msg InboxMessage, okMessage string) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{Success: true, Message: okMessage})
+	respondJSON(w, http.StatusOK, Response{Success: true, Message: okMessage})
 }
 
 func tmuxOutput(args ...string) ([]byte, error) {
