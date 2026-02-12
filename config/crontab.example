@@ -1,0 +1,33 @@
+# Agent Box Crontab
+# Place this file at /data/config/crontab to auto-load on container start.
+# Edit on VM with: crontab -e
+#
+# Format: minute hour day month weekday command
+
+# Load environment for all cron jobs
+SHELL=/bin/bash
+BASH_ENV=/data/home/agent/.env.secrets
+
+# =============================================================================
+# Example: Cleanup jobs
+# =============================================================================
+
+# Clean pnpm store weekly (Sunday 3am)
+# 0 3 * * 0 pnpm store prune >> /data/logs/cron.log 2>&1
+
+# Rotate agent logs monthly
+# 0 4 1 * * find /data/logs -name "*.log" -mtime +30 -delete
+
+# =============================================================================
+# Example: Health/monitoring
+# =============================================================================
+
+# Disk space check every 6 hours, alert if > 80%
+# 0 */6 * * * df -h /data | awk 'NR==2 && int($5) > 80 {print "Disk usage: "$5}' >> /data/logs/cron.log 2>&1
+
+# =============================================================================
+# Notes
+# =============================================================================
+# - Cron runs as the 'agent' user
+# - Environment is loaded from ~/.env.secrets (DATABASE_URL, TELEGRAM_*, etc.)
+# - Logs: check /var/log/syslog or redirect output to /data/logs/cron.log

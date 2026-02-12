@@ -179,20 +179,20 @@ cc-attach myproject
 
 ## Agent Commands
 
-| Command                          | Description                    |
-| -------------------------------- | ------------------------------ |
-| `cc-new <name> <dir>`            | Create agent in directory      |
-| `cc-new <name> @project/branch`  | Create agent with git worktree |
-| `cc-new <name> <dir> --attach`   | Create and attach immediately  |
-| `cc-new <name> <dir> --type codex` | Create agent using Codex CLI |
-| `cc-ls`                          | List all running agents        |
-| `cc-attach <name>`               | Attach to existing agent       |
-| `cc-stop <name>`                 | Stop an agent                  |
-| `cc-stop --all`                  | Stop all agents                |
-| `vm-setup`                       | Interactive setup wizard       |
-| `init-admin`                     | Create orchestrator workspace  |
-| `takopi-restart`                 | Restart Takopi bot             |
-| `takopi-add-project <name>`      | Add project to Takopi config   |
+| Command                            | Description                    |
+| ---------------------------------- | ------------------------------ |
+| `cc-new <name> <dir>`              | Create agent in directory      |
+| `cc-new <name> @project/branch`    | Create agent with git worktree |
+| `cc-new <name> <dir> --attach`     | Create and attach immediately  |
+| `cc-new <name> <dir> --type codex` | Create agent using Codex CLI   |
+| `cc-ls`                            | List all running agents        |
+| `cc-attach <name>`                 | Attach to existing agent       |
+| `cc-stop <name>`                   | Stop an agent                  |
+| `cc-stop --all`                    | Stop all agents                |
+| `vm-setup`                         | Interactive setup wizard       |
+| `init-admin`                       | Create orchestrator workspace  |
+| `takopi-restart`                   | Restart Takopi bot             |
+| `takopi-add-project <name>`        | Add project to Takopi config   |
 
 ### Multiple Agent Engines
 
@@ -317,16 +317,16 @@ Multiple SSH sessions can attach to the same tmux session simultaneously.
 
 Set via `fly secrets set`:
 
-| Variable             | Description                       | Required        |
-| -------------------- | --------------------------------- | --------------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key                | Yes             |
-| `AUTHORIZED_KEYS`    | SSH public keys                   | Yes             |
-| `ANTHROPIC_API_KEY`  | Claude API key                    | No              |
-| `OPENAI_API_KEY`     | For Codex CLI and voice transcription | No          |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token                | No              |
-| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync   | No              |
-| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot   | No (default: 1) |
-| `AUTO_UPDATE_CODEX`  | Auto-update Codex CLI on boot     | No (default: 1) |
+| Variable             | Description                           | Required        |
+| -------------------- | ------------------------------------- | --------------- |
+| `TAILSCALE_AUTHKEY`  | Tailscale auth key                    | Yes             |
+| `AUTHORIZED_KEYS`    | SSH public keys                       | Yes             |
+| `ANTHROPIC_API_KEY`  | Claude API key                        | No              |
+| `OPENAI_API_KEY`     | For Codex CLI and voice transcription | No              |
+| `WEBHOOK_AUTH_TOKEN` | Webhook auth token                    | No              |
+| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync       | No              |
+| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot       | No (default: 1) |
+| `AUTO_UPDATE_CODEX`  | Auto-update Codex CLI on boot         | No (default: 1) |
 
 ### VM Environment (`~/.bashrc`)
 
@@ -351,6 +351,32 @@ base_branch = "main"
 [projects.myproject]
 path = "/data/repos/myproject"
 ```
+
+### Scheduled Tasks (Cron)
+
+Agent Box supports user crontabs for scheduled tasks. Place your crontab at `/data/config/crontab`:
+
+```bash
+# On the VM
+cp /opt/config/crontab.example /data/config/crontab
+crontab /data/config/crontab
+```
+
+The crontab is auto-loaded on container start. Example:
+
+```cron
+# Load environment
+SHELL=/bin/bash
+BASH_ENV=/data/home/agent/.env.secrets
+
+# Weekly cleanup
+0 3 * * 0 pnpm store prune >> /data/logs/cron.log 2>&1
+
+# Rotate agent logs monthly
+0 4 1 * * find /data/logs -name "*.log" -mtime +30 -delete
+```
+
+See `crontab.example` for more examples.
 
 ### Claude Config Sync
 

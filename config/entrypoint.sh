@@ -238,6 +238,23 @@ else
     echo "Takopi not configured (no ~/.takopi/takopi.toml)"
 fi
 
+# Load user crontab if configured
+CRONTAB_FILE="/data/config/crontab"
+if [ -f "$CRONTAB_FILE" ]; then
+    echo "Loading user crontab from $CRONTAB_FILE..."
+    # Start cron daemon if not running
+    if ! pgrep -x cron >/dev/null; then
+        cron
+        echo "Started cron daemon"
+    fi
+    # Install crontab for agent user
+    su - agent -c "crontab '$CRONTAB_FILE'" && \
+        echo "Installed crontab for agent user" || \
+        echo "Warning: Failed to install crontab"
+else
+    echo "No custom crontab found at $CRONTAB_FILE"
+fi
+
 # Start health check watchdog in background
 if [ "${ENABLE_HEALTHCHECK:-1}" = "1" ]; then
     echo "Starting health check watchdog..."

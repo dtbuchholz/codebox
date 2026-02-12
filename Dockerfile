@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y \
     man-db \
     less \
     unzip \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale
@@ -97,6 +98,7 @@ COPY config/claude-settings.json /opt/claude-settings.json
 RUN mkdir -p /opt/config /opt/git-hooks
 COPY config/agentbox.toml.example /opt/config/agentbox.toml.example
 COPY config/takopi.toml.example /opt/config/takopi.toml.example
+COPY config/crontab.example /opt/config/crontab.example
 COPY config/git-hooks/ /opt/git-hooks/
 RUN chmod +x /entrypoint.sh /opt/git-hooks/*
 
