@@ -17,6 +17,10 @@ if ! fly auth whoami &> /dev/null; then
     fly auth login
 fi
 
+# Read app name from fly.toml if present, then env var, then default
+if [ -z "$FLY_APP_NAME" ] && [ -f fly.toml ]; then
+    FLY_APP_NAME=$(grep '^app\s*=' fly.toml | sed 's/^app[[:space:]]*=[[:space:]]*//; s/^"//; s/"$//')
+fi
 APP_NAME="${FLY_APP_NAME:-agent-box}"
 REGION="${FLY_REGION:-sjc}"
 
