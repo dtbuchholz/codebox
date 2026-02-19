@@ -9,10 +9,10 @@ SHELL=/bin/bash
 BASH_ENV=/data/home/agent/.env.secrets
 
 # =============================================================================
-# CLI updates (daily at 4am UTC)
+# CLI updates (daily at 3am EST / 8am UTC)
 # =============================================================================
 
-0 4 * * * /usr/local/bin/update-clis >> /data/logs/cron.log 2>&1
+0 8 * * * /usr/local/bin/update-clis >> /data/logs/cron.log 2>&1
 
 # =============================================================================
 # Example: Cleanup jobs
