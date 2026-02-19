@@ -1,0 +1,57 @@
+#!/bin/bash
+# update-clis - Update Claude Code and Codex CLI to latest versions
+#
+# Usage:
+#   update-clis           # Update all CLIs
+#   update-clis --check   # Show current versions without updating
+#
+# Designed to run via cron (daily) or manually.
+# Requires sudo for global npm installs.
+
+set -e
+
+LOG_PREFIX="[update-clis]"
+
+log() { echo "$LOG_PREFIX $*"; }
+
+if [ "$1" = "--check" ]; then
+    echo "Claude Code: $(claude --version 2>/dev/null || echo 'not installed')"
+    echo "Codex CLI:   $(codex --version 2>/dev/null || echo 'not installed')"
+    exit 0
+fi
+
+UPDATED=""
+
+# Update Claude Code
+if command -v claude &>/dev/null; then
+    OLD_VER=$(claude --version 2>/dev/null | head -1)
+    log "Updating Claude Code (current: $OLD_VER)..."
+    sudo npm install -g @anthropic-ai/claude-code 2>/dev/null
+    NEW_VER=$(claude --version 2>/dev/null | head -1)
+    if [ "$OLD_VER" != "$NEW_VER" ]; then
+        log "Claude Code updated: $OLD_VER -> $NEW_VER"
+        UPDATED="claude"
+    else
+        log "Claude Code already at latest ($NEW_VER)"
+    fi
+fi
+
+# Update Codex CLI
+if command -v codex &>/dev/null; then
+    OLD_VER=$(codex --version 2>/dev/null | head -1)
+    log "Updating Codex CLI (current: $OLD_VER)..."
+    sudo npm install -g @openai/codex 2>/dev/null
+    NEW_VER=$(codex --version 2>/dev/null | head -1)
+    if [ "$OLD_VER" != "$NEW_VER" ]; then
+        log "Codex CLI updated: $OLD_VER -> $NEW_VER"
+        UPDATED="$UPDATED codex"
+    else
+        log "Codex CLI already at latest ($NEW_VER)"
+    fi
+fi
+
+if [ -z "$UPDATED" ]; then
+    log "No updates needed"
+else
+    log "Done. Updated:$UPDATED"
+fi
