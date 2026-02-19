@@ -150,21 +150,21 @@ if [ "${ENABLE_WEBHOOK:-1}" = "1" ]; then
 fi
 
 # Install or update Claude Code
-if ! command -v claude &> /dev/null; then
+if [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ]; then
+    echo "Installing/updating Claude Code..."
+    npm install -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code install/update skipped"
+elif ! command -v claude &> /dev/null; then
     echo "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code || echo "Claude Code install will complete on first run"
-elif [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ]; then
-    echo "Checking for Claude Code updates..."
-    npm update -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code update check skipped"
 fi
 
 # Install or update OpenAI Codex CLI
-if ! command -v codex &> /dev/null; then
-    echo "Installing OpenAI Codex CLI..."
+if [ "${AUTO_UPDATE_CODEX:-1}" = "1" ]; then
+    echo "Installing/updating Codex CLI..."
+    npm install -g @openai/codex 2>/dev/null || echo "Codex CLI install/update skipped"
+elif ! command -v codex &> /dev/null; then
+    echo "Installing Codex CLI..."
     npm install -g @openai/codex || echo "Codex CLI install will complete on first run"
-elif [ "${AUTO_UPDATE_CODEX:-1}" = "1" ]; then
-    echo "Checking for Codex CLI updates..."
-    npm update -g @openai/codex 2>/dev/null || echo "Codex CLI update check skipped"
 fi
 
 # Ensure Codex home directory persists on volume
@@ -201,6 +201,8 @@ AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
     [ -n "$ANTHROPIC_BASE_URL" ] && echo "export ANTHROPIC_BASE_URL=\"$ANTHROPIC_BASE_URL\""
     [ -n "$OPENAI_API_KEY" ] && echo "export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
     [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
+    # GH_TOKEN for GitHub CLI (headless auth without gh auth login)
+    [ -n "$GH_TOKEN" ] && echo "export GH_TOKEN=\"$GH_TOKEN\""
     # Codex home directory for persistent state
     echo "export CODEX_HOME=\"/data/.codex\""
 } > "$AGENT_ENV_FILE"
