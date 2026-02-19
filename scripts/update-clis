@@ -6,7 +6,7 @@
 #   update-clis --check   # Show current versions without updating
 #
 # Designed to run via cron (daily) or manually.
-# Requires sudo for global npm installs.
+# Claude Code uses the native installer; Codex uses npm.
 
 set -e
 
@@ -22,11 +22,10 @@ fi
 
 UPDATED=""
 
-# Update Claude Code
-if command -v claude &>/dev/null; then
-    OLD_VER=$(claude --version 2>/dev/null | head -1)
-    log "Updating Claude Code (current: $OLD_VER)..."
-    sudo npm install -g @anthropic-ai/claude-code 2>/dev/null
+# Update Claude Code (native installer)
+OLD_VER=$(claude --version 2>/dev/null | head -1 || echo "not installed")
+log "Updating Claude Code (current: $OLD_VER)..."
+if curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null; then
     NEW_VER=$(claude --version 2>/dev/null | head -1)
     if [ "$OLD_VER" != "$NEW_VER" ]; then
         log "Claude Code updated: $OLD_VER -> $NEW_VER"
@@ -34,9 +33,11 @@ if command -v claude &>/dev/null; then
     else
         log "Claude Code already at latest ($NEW_VER)"
     fi
+else
+    log "Claude Code update failed"
 fi
 
-# Update Codex CLI
+# Update Codex CLI (npm)
 if command -v codex &>/dev/null; then
     OLD_VER=$(codex --version 2>/dev/null | head -1)
     log "Updating Codex CLI (current: $OLD_VER)..."

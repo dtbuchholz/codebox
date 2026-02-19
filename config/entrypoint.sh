@@ -149,13 +149,10 @@ if [ "${ENABLE_WEBHOOK:-1}" = "1" ]; then
     WEBHOOK_PID=$!
 fi
 
-# Install or update Claude Code
-if [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ]; then
-    echo "Installing/updating Claude Code..."
-    npm install -g @anthropic-ai/claude-code 2>/dev/null || echo "Claude Code install/update skipped"
-elif ! command -v claude &> /dev/null; then
-    echo "Installing Claude Code..."
-    npm install -g @anthropic-ai/claude-code || echo "Claude Code install will complete on first run"
+# Install or update Claude Code (native installer, runs as agent user)
+if [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ] || ! su - agent -c "command -v claude" &>/dev/null; then
+    echo "Installing/updating Claude Code (native)..."
+    su - agent -c "curl -fsSL https://claude.ai/install.sh | bash" 2>/dev/null || echo "Claude Code install/update skipped"
 fi
 
 # Install or update OpenAI Codex CLI
@@ -203,6 +200,8 @@ AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
     [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
     # GH_TOKEN for GitHub CLI (headless auth without gh auth login)
     [ -n "$GH_TOKEN" ] && echo "export GH_TOKEN=\"$GH_TOKEN\""
+    # Disable Claude Code self-updater (updates managed via update-clis cron)
+    echo "export DISABLE_AUTOUPDATER=1"
     # Codex home directory for persistent state
     echo "export CODEX_HOME=\"/data/.codex\""
 } > "$AGENT_ENV_FILE"
