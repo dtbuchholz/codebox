@@ -1,22 +1,24 @@
 #!/bin/bash
-# update-clis - Update Claude Code and Codex CLI to latest versions
+# update-clis - Update Claude Code, Codex CLI, and Takopi to latest versions
 #
 # Usage:
 #   update-clis           # Update all CLIs
 #   update-clis --check   # Show current versions without updating
 #
 # Designed to run via cron (daily) or manually.
-# Claude Code uses the native installer; Codex uses npm.
+# Claude Code uses the native installer; Codex uses npm; Takopi uses uv.
 
 set -e
 
 LOG_PREFIX="[update-clis]"
+AGENT_HOME="${AGENT_HOME:-/data/home/agent}"
 
-log() { echo "$LOG_PREFIX $*"; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $LOG_PREFIX $*"; }
 
 if [ "$1" = "--check" ]; then
     echo "Claude Code: $(claude --version 2>/dev/null || echo 'not installed')"
     echo "Codex CLI:   $(codex --version 2>/dev/null || echo 'not installed')"
+    echo "Takopi:      $(takopi --version 2>/dev/null || echo 'not installed')"
     exit 0
 fi
 
@@ -41,13 +43,33 @@ fi
 if command -v codex &>/dev/null; then
     OLD_VER=$(codex --version 2>/dev/null | head -1)
     log "Updating Codex CLI (current: $OLD_VER)..."
-    sudo npm install -g @openai/codex 2>/dev/null
-    NEW_VER=$(codex --version 2>/dev/null | head -1)
-    if [ "$OLD_VER" != "$NEW_VER" ]; then
-        log "Codex CLI updated: $OLD_VER -> $NEW_VER"
-        UPDATED="$UPDATED codex"
+    if sudo npm install -g @openai/codex 2>/dev/null; then
+        NEW_VER=$(codex --version 2>/dev/null | head -1)
+        if [ "$OLD_VER" != "$NEW_VER" ]; then
+            log "Codex CLI updated: $OLD_VER -> $NEW_VER"
+            UPDATED="$UPDATED codex"
+        else
+            log "Codex CLI already at latest ($NEW_VER)"
+        fi
     else
-        log "Codex CLI already at latest ($NEW_VER)"
+        log "Codex CLI update failed"
+    fi
+fi
+
+# Update Takopi (uv tool)
+if command -v takopi &>/dev/null || [ -x "$AGENT_HOME/.local/bin/takopi" ]; then
+    OLD_VER=$(takopi --version 2>/dev/null | head -1 || echo "unknown")
+    log "Updating Takopi (current: $OLD_VER)..."
+    if uv tool upgrade takopi 2>/dev/null; then
+        NEW_VER=$(takopi --version 2>/dev/null | head -1)
+        if [ "$OLD_VER" != "$NEW_VER" ]; then
+            log "Takopi updated: $OLD_VER -> $NEW_VER"
+            UPDATED="$UPDATED takopi"
+        else
+            log "Takopi already at latest ($NEW_VER)"
+        fi
+    else
+        log "Takopi update failed"
     fi
 fi
 

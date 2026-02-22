@@ -221,6 +221,14 @@ if ! grep -q "NODE_OPTIONS" "$AGENT_HOME/.bashrc" 2>/dev/null; then
     echo "Configured Node.js memory limit: ${NODE_MAX_MEM}MB"
 fi
 
+# Install or update Takopi
+if command -v takopi &> /dev/null || [ -x "$AGENT_HOME/.local/bin/takopi" ]; then
+    if [ "${AUTO_UPDATE_TAKOPI:-1}" = "1" ]; then
+        echo "Checking for Takopi updates..."
+        su - agent -c "uv tool upgrade takopi" 2>/dev/null || echo "Takopi update check skipped"
+    fi
+fi
+
 # Auto-start Takopi if configured
 if [ -f "$AGENT_HOME/.takopi/takopi.toml" ]; then
     echo "Starting Takopi (Telegram bot)..."
@@ -262,6 +270,13 @@ if [ "${ENABLE_HEALTHCHECK:-1}" = "1" ]; then
     /usr/local/bin/healthcheck.sh --watch >> /data/logs/healthcheck.log 2>&1 &
     HEALTHCHECK_PID=$!
 fi
+
+# Set up daily CLI update cron job for agent user
+echo "Setting up daily CLI update cron..."
+CRON_ENTRY="0 4 * * * /usr/local/bin/update-clis >> /data/logs/cron.log 2>&1"
+(su - agent -c "crontab -l 2>/dev/null" | grep -v "update-clis"; echo "$CRON_ENTRY") | su - agent -c "crontab -"
+# Ensure cron daemon is running
+service cron start 2>/dev/null || true
 
 echo "=== Agent Box Ready ==="
 echo "SSH: port 2222"
