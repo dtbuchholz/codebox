@@ -122,7 +122,7 @@ lint-shell:
 
 lint-docker:
 	@echo "Linting Dockerfile..."
-	@hadolint --ignore DL3008 --ignore DL3013 --ignore DL3015 --ignore DL3016 --ignore DL4006 Dockerfile
+	@hadolint --ignore DL3008 --ignore DL3013 --ignore DL3015 --ignore DL3016 Dockerfile
 
 lint-format:
 	@echo "Checking formatting (Prettier)..."

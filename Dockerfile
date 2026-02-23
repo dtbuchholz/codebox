@@ -11,6 +11,8 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o webhook-receiver .
 # Stage 2: Runtime image
 FROM debian:bookworm-slim
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -28,12 +30,12 @@ RUN apt-get update && apt-get install -y \
     vim \
     htop \
     procps \
+    cron \
     locales \
     postgresql \
     man-db \
     less \
     unzip \
-    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale
@@ -89,7 +91,7 @@ COPY --from=webhook-builder /build/webhook-receiver /usr/local/bin/
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/takopi-* /usr/local/bin/healthcheck.sh /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh /usr/local/bin/init-admin /usr/local/bin/update-clis 2>/dev/null || true \
+RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/takopi-* /usr/local/bin/healthcheck.sh /usr/local/bin/update-clis /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh /usr/local/bin/init-admin 2>/dev/null || true \
     && ln -sf /usr/local/bin/vm-setup.sh /usr/local/bin/vm-setup
 
 # Copy config files
