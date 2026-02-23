@@ -39,6 +39,7 @@ repos:
     rev: v2.13.1-beta
     hooks:
       - id: hadolint-docker
+        files: ^Dockerfile$
         args: [
             "--ignore",
             "DL3008",
@@ -50,18 +51,22 @@ repos:
             "DL3016",
           ] # Allow unpinned versions and recommended packages (dev VM)
 
-  # Go formatting and linting
+  # Go formatting and linting (local hooks to handle webhook/ subdirectory)
   - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
       - id: go-fmt
-      - id: go-vet
-      - id: go-imports
       - id: go-mod-tidy
 
-  # Go static analysis (uses local golangci-lint)
   - repo: local
     hooks:
+      - id: go-vet
+        name: go vet
+        entry: bash -c 'cd webhook && go vet ./...'
+        language: system
+        files: '\.go$'
+        pass_filenames: false
+
       - id: golangci-lint
         name: golangci-lint
         entry: bash -c 'cd webhook && golangci-lint run --fix'
