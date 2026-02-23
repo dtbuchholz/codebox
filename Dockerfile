@@ -11,6 +11,8 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o webhook-receiver .
 # Stage 2: Runtime image
 FROM debian:bookworm-slim
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -28,12 +30,12 @@ RUN apt-get update && apt-get install -y \
     vim \
     htop \
     procps \
+    cron \
     locales \
     postgresql \
     man-db \
     less \
     unzip \
-    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale
