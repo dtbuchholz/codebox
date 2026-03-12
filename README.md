@@ -9,7 +9,7 @@ A remote "agent box" on Fly.io for running long-lived Claude Code sessions insid
 - **Telegram integration**: Chat with agents via [Takopi](https://takopi.dev) - text, voice, files
 - **Phone-first access**: Connect via Tailscale + SSH from iOS (Blink, Termius)
 - **Git worktrees**: Each agent can work on its own branch without conflicts
-- **Dev tools included**: PostgreSQL, pnpm, gh CLI, and more pre-installed
+- **Dev tools included**: PostgreSQL, Python 3, uv, pnpm, gh CLI, and more pre-installed
 
 ## Architecture
 
@@ -82,7 +82,7 @@ fly secrets set TAILSCALE_AUTHKEY="tskey-auth-xxx"
 fly secrets set AUTHORIZED_KEYS="$(cat ~/.ssh/id_ed25519.pub)"
 
 # Deploy
-fly deploy
+make deploy
 ```
 
 After deploy, get your Tailscale IP:
@@ -122,42 +122,30 @@ git config --global user.email "you@example.com"
 git config --global user.name "Your Name"
 ```
 
-**Claude Code authentication** (choose one):
+**Claude Code authentication:**
 
 ```bash
-# Option A: Fly secrets (recommended)
-fly secrets set ANTHROPIC_API_KEY="sk-ant-..."
+# Option A: OAuth token (preferred — uses your subscription)
+make fly-auth                      # Opens SSH session with instructions
+# Then from local machine:
+fly secrets set CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat-..." -a <app-name>
 
-# Option B: bashrc
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
-source ~/.bashrc
-
-# Option C: Interactive login
-claude   # then use /login
+# Option B: API key (fallback)
+fly secrets set ANTHROPIC_API_KEY="sk-ant-..." -a <app-name>
 ```
 
 **Codex CLI authentication** (if using Codex):
 
 ```bash
-# Option A: Fly secrets (recommended)
-fly secrets set OPENAI_API_KEY="sk-..."
+# OAuth via device code flow (uses your ChatGPT subscription)
+make fly-auth                      # Opens SSH session
+# On the VM:
+/usr/bin/codex login --device-auth # Follow browser flow
 
-# Option B: Interactive login
-codex   # then sign in with ChatGPT account or API key
+# Credentials persist at /data/.codex/auth.json across redeploys
 ```
 
-For OpenRouter or custom endpoints, configure `~/.codex/config.toml`:
-
-```toml
-model = "anthropic/claude-sonnet-4"
-model_provider = "openrouter"
-
-[model_providers.openrouter]
-base_url = "https://openrouter.ai/api/v1"
-env_key = "OPENROUTER_API_KEY"
-```
-
-Or set `OPENAI_BASE_URL` to point to your proxy.
+> **Note:** The Codex wrapper at `/usr/local/bin/codex` unsets `OPENAI_API_KEY` so Codex always uses OAuth.
 
 ### Phase 3: Start Using Agents
 
@@ -317,24 +305,28 @@ Multiple SSH sessions can attach to the same tmux session simultaneously.
 
 Set via `fly secrets set`:
 
-| Variable             | Description                           | Required        |
-| -------------------- | ------------------------------------- | --------------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key                    | Yes             |
-| `AUTHORIZED_KEYS`    | SSH public keys                       | Yes             |
-| `ANTHROPIC_API_KEY`  | Claude API key                        | No              |
-| `OPENAI_API_KEY`     | For Codex CLI and voice transcription | No              |
-| `WEBHOOK_AUTH_TOKEN` | Webhook auth token                    | No              |
-| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync       | No              |
-| `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot       | No (default: 1) |
-| `AUTO_UPDATE_CODEX`  | Auto-update Codex CLI on boot         | No (default: 1) |
+| Variable                  | Description                         | Required        |
+| ------------------------- | ----------------------------------- | --------------- |
+| `TAILSCALE_AUTHKEY`       | Tailscale auth key                  | Yes             |
+| `AUTHORIZED_KEYS`         | SSH public keys                     | Yes             |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token (preferred) | No              |
+| `ANTHROPIC_API_KEY`       | Claude API key (fallback)           | No              |
+| `OPENAI_API_KEY`          | Takopi TTS (not used by Codex)      | No              |
+| `OPENROUTER_API_KEY`      | OpenRouter for non-Anthropic models | No              |
+| `WEBHOOK_AUTH_TOKEN`      | Webhook auth token                  | No              |
+| `CLAUDE_CONFIG_REPO`      | Git repo for Claude config sync     | No              |
+| `AUTO_UPDATE_CLAUDE`      | Auto-update Claude Code on boot     | No (default: 1) |
+| `AUTO_UPDATE_CODEX`       | Auto-update Codex CLI on boot       | No (default: 1) |
 
 ### VM Environment (`~/.bashrc`)
 
-| Variable             | Description                       |
-| -------------------- | --------------------------------- |
-| `ANTHROPIC_API_KEY`  | API key (Anthropic or OpenRouter) |
-| `ANTHROPIC_BASE_URL` | Proxy URL (e.g., OpenRouter)      |
-| `OPENAI_API_KEY`     | For voice transcription           |
+| Variable                  | Description                         |
+| ------------------------- | ----------------------------------- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token (preferred) |
+| `ANTHROPIC_API_KEY`       | Claude API key (fallback)           |
+| `ANTHROPIC_BASE_URL`      | Proxy URL (e.g., OpenRouter)        |
+| `OPENAI_API_KEY`          | Takopi TTS                          |
+| `OPENROUTER_API_KEY`      | OpenRouter for non-Anthropic models |
 
 ### Agent Box Config (`/data/config/agentbox.toml`)
 
@@ -427,6 +419,8 @@ claude-config/
 | `codex`             | OpenAI Codex CLI                       |
 | `gh`                | GitHub CLI                             |
 | `git`               | Version control                        |
+| `python3`           | Python 3                               |
+| `uv`                | Python package/project manager         |
 | `psql`              | PostgreSQL client (server auto-starts) |
 | `pnpm`              | Node.js package manager                |
 | `node`              | Node.js 22.x LTS                       |
@@ -566,7 +560,7 @@ cat ~/.takopi/takopi.toml  # Check config
 takopi --verbose           # Debug mode
 ```
 
-**Voice not working:** Set OpenAI API key via Fly secrets:
+**Voice not working:** Takopi uses `OPENAI_API_KEY` for TTS (this key is _not_ used by Codex):
 
 ```bash
 fly secrets set OPENAI_API_KEY="sk-..."
