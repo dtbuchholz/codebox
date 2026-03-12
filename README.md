@@ -315,6 +315,7 @@ Set via `fly secrets set`:
 | `OPENROUTER_API_KEY`      | OpenRouter for non-Anthropic models | No              |
 | `WEBHOOK_AUTH_TOKEN`      | Webhook auth token                  | No              |
 | `CLAUDE_CONFIG_REPO`      | Git repo for Claude config sync     | No              |
+| `CODEX_CONFIG_REPO`       | Git repo for Codex config sync      | No              |
 | `AUTO_UPDATE_CLAUDE`      | Auto-update Claude Code on boot     | No (default: 1) |
 | `AUTO_UPDATE_CODEX`       | Auto-update Codex CLI on boot       | No (default: 1) |
 
@@ -327,6 +328,7 @@ Set via `fly secrets set`:
 | `ANTHROPIC_BASE_URL`      | Proxy URL (e.g., OpenRouter)        |
 | `OPENAI_API_KEY`          | Takopi TTS                          |
 | `OPENROUTER_API_KEY`      | OpenRouter for non-Anthropic models |
+| `CODEX_CONFIG_REPO`       | Git repo for Codex config sync      |
 
 ### Agent Box Config (`/data/config/agentbox.toml`)
 
@@ -390,6 +392,27 @@ The repo structure should match `~/.claude/`:
 claude-config/
 ├── settings.json
 └── settings.local.json
+```
+
+### Codex Config Sync
+
+Sync Codex CLI config from a git repo. Unlike Claude config sync, this clones to a staging directory and copies config files into `$CODEX_HOME` (`/data/.codex`), preserving state files like `auth.json` and session data.
+
+```bash
+# Set repo URL
+fly secrets set CODEX_CONFIG_REPO=https://github.com/user/codex-config
+
+# Manual sync
+codex-config-sync
+codex-config-sync --init    # First-time clone
+codex-config-sync --status  # Check status
+```
+
+The repo should contain config files (e.g., `config.toml`):
+
+```
+codex-config/
+└── config.toml
 ```
 
 ## Directory Structure

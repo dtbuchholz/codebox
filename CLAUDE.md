@@ -50,6 +50,7 @@ When modifying VM setup or documentation, be aware of these key configurations:
 | `OPENAI_API_KEY`          | Takopi TTS (not used by Codex, wrapper unsets it) |
 | `OPENROUTER_API_KEY`      | OpenRouter backup for non-Anthropic models        |
 | `CLAUDE_CONFIG_REPO`      | Git repo for Claude config sync                   |
+| `CODEX_CONFIG_REPO`       | Git repo for Codex config sync                    |
 
 ### SSH Commit Signing
 

@@ -1,0 +1,197 @@
+#!/bin/bash
+# codex-config-sync - Sync Codex CLI config from a remote git repo
+#
+# Usage: codex-config-sync [--init|--status]
+#
+# Requires CODEX_CONFIG_REPO env var to be set (e.g., https://github.com/user/codex-config)
+#
+# Key difference from claude-config-sync: $CODEX_HOME contains both config and state
+# (auth.json, sqlite, sessions, etc.), so we clone to a staging dir and copy config files in.
+
+set -e
+
+AGENT_HOME="${AGENT_HOME:-$HOME}"
+CODEX_HOME="${CODEX_HOME:-$AGENT_HOME/.codex}"
+REPO_DIR="/data/config/codex-config"
+REPO_URL="${CODEX_CONFIG_REPO:-}"
+
+log() {
+    echo "[codex-config-sync] $*"
+}
+
+usage() {
+    echo "Usage: codex-config-sync [--init|--status]"
+    echo ""
+    echo "Sync Codex CLI config from a remote git repo."
+    echo ""
+    echo "The repo is cloned to $REPO_DIR and config files are"
+    echo "copied into \$CODEX_HOME ($CODEX_HOME). State files"
+    echo "(auth.json, *.sqlite, sessions/, log/) are never touched."
+    echo ""
+    echo "Options:"
+    echo "  --init     Initialize (clone) the repo if not present"
+    echo "  --status   Show sync status"
+    echo ""
+    echo "Environment:"
+    echo "  CODEX_CONFIG_REPO  Git repo URL (required)"
+    echo "  CODEX_HOME         Codex home directory (default: ~/.codex)"
+    echo ""
+    echo "Example:"
+    echo "  export CODEX_CONFIG_REPO=https://github.com/user/codex-config"
+    echo "  codex-config-sync --init"
+    exit 1
+}
+
+check_repo_var() {
+    if [ -z "$REPO_URL" ]; then
+        log "CODEX_CONFIG_REPO not set, skipping sync"
+        exit 0
+    fi
+}
+
+is_git_repo() {
+    [ -d "$REPO_DIR/.git" ]
+}
+
+# Copy config files from repo into $CODEX_HOME, skipping state files
+copy_config_files() {
+    mkdir -p "$CODEX_HOME"
+
+    local count=0
+    for f in "$REPO_DIR"/*; do
+        [ -e "$f" ] || continue
+        local name
+        name=$(basename "$f")
+
+        # Skip .git directory
+        [ "$name" = ".git" ] && continue
+
+        cp -a "$f" "$CODEX_HOME/$name"
+        log "  copied: $name"
+        ((count++))
+    done
+
+    # Also copy dotfiles (e.g., .instructions.md) but not .git
+    for f in "$REPO_DIR"/.*; do
+        [ -e "$f" ] || continue
+        local name
+        name=$(basename "$f")
+
+        case "$name" in
+            .|..|.git) continue ;;
+        esac
+
+        cp -a "$f" "$CODEX_HOME/$name"
+        log "  copied: $name"
+        ((count++))
+    done
+
+    log "Copied $count config file(s) to $CODEX_HOME"
+}
+
+show_status() {
+    check_repo_var
+
+    if is_git_repo; then
+        log "Status: synced"
+        log "Repo: $REPO_URL"
+        log "Staging: $REPO_DIR"
+        log "Target: $CODEX_HOME"
+        cd "$REPO_DIR"
+        log "Branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+        log "Last commit: $(git log -1 --format='%h %s' 2>/dev/null || echo 'unknown')"
+
+        # Check if behind remote
+        git fetch --quiet 2>/dev/null || true
+        local behind
+        behind=$(git rev-list HEAD..origin/HEAD --count 2>/dev/null || echo "0")
+        if [ "$behind" -gt 0 ]; then
+            log "Status: $behind commit(s) behind remote"
+        else
+            log "Status: up to date"
+        fi
+    else
+        log "Status: not initialized"
+        log "Run: codex-config-sync --init"
+    fi
+}
+
+init_repo() {
+    check_repo_var
+
+    if is_git_repo; then
+        log "Already initialized, pulling latest..."
+        sync_repo
+        return
+    fi
+
+    log "Initializing Codex config from $REPO_URL"
+
+    # Clone to staging directory
+    log "Cloning $REPO_URL to $REPO_DIR"
+    mkdir -p "$(dirname "$REPO_DIR")"
+    git clone --quiet "$REPO_URL" "$REPO_DIR"
+
+    # Copy config files into CODEX_HOME
+    copy_config_files
+
+    log "Initialized successfully"
+    show_status
+}
+
+sync_repo() {
+    check_repo_var
+
+    if ! is_git_repo; then
+        log "Not initialized. Run: codex-config-sync --init"
+        exit 1
+    fi
+
+    cd "$REPO_DIR"
+
+    # Check for local changes
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        log "Warning: local changes detected, stashing..."
+        git stash --quiet
+    fi
+
+    # Pull latest
+    log "Pulling latest from remote..."
+    if git pull --quiet --rebase 2>/dev/null; then
+        log "Synced successfully"
+    else
+        log "Warning: pull failed, trying fetch + reset..."
+        git fetch --quiet
+        git reset --hard origin/HEAD --quiet
+        log "Reset to remote HEAD"
+    fi
+
+    # Copy config files into CODEX_HOME
+    copy_config_files
+}
+
+# Parse args
+case "${1:-}" in
+    --init)
+        init_repo
+        ;;
+    --status)
+        show_status
+        ;;
+    --help|-h)
+        usage
+        ;;
+    "")
+        # Default: sync if initialized, otherwise skip
+        if is_git_repo; then
+            sync_repo
+        else
+            check_repo_var
+            log "Not initialized. Run: codex-config-sync --init"
+        fi
+        ;;
+    *)
+        echo "Unknown option: $1"
+        usage
+        ;;
+esac

@@ -47,6 +47,7 @@ codebox/
 │   ├── healthcheck.sh    # Service monitoring (60s interval)
 │   ├── vm-setup.sh       # Interactive VM setup wizard
 │   ├── claude-config-sync # Sync Claude config from remote repo
+│   ├── codex-config-sync  # Sync Codex config from remote repo
 │   ├── claude-hook-check-push # PreToolUse hook to block main/master pushes
 │   ├── takopi-restart    # Restart Takopi bot
 │   └── bootstrap.sh      # Fresh VM setup script
@@ -152,6 +153,7 @@ These env vars are set via `fly secrets set` and exported to the agent user by `
 | `ANTHROPIC_API_KEY`  | Claude API key                  |
 | `OPENAI_API_KEY`     | For Takopi voice transcription  |
 | `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync |
+| `CODEX_CONFIG_REPO`  | Git repo for Codex config sync  |
 | `AUTO_UPDATE_CLAUDE` | Auto-update Claude Code on boot |
 
 ### Branch Protection

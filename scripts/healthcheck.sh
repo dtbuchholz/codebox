@@ -190,6 +190,32 @@ sync_claude_config() {
     fi
 }
 
+sync_codex_config() {
+    # Sync Codex config from remote repo daily
+    # Only runs if CODEX_CONFIG_REPO is set and repo is initialized
+    if [ -z "$CODEX_CONFIG_REPO" ]; then
+        return 0
+    fi
+
+    if [ ! -d "/data/config/codex-config/.git" ]; then
+        return 0
+    fi
+
+    # Only sync once per day
+    CODEX_SYNC_MARKER="/tmp/codex-config-sync-$(date +%Y%m%d)"
+    if [ -f "$CODEX_SYNC_MARKER" ]; then
+        return 0
+    fi
+
+    log "Syncing Codex config (daily)..."
+    if su - agent -c "CODEX_CONFIG_REPO='$CODEX_CONFIG_REPO' codex-config-sync" 2>/dev/null; then
+        touch "$CODEX_SYNC_MARKER"
+        log "Codex config: synced"
+    else
+        log "Codex config: sync failed"
+    fi
+}
+
 run_checks() {
     local failed=0
 
@@ -198,6 +224,7 @@ run_checks() {
     check_takopi || ((failed++))
     check_memory || true  # Don't count memory warning as failure
     sync_claude_config || true  # Don't count sync failure
+    sync_codex_config || true  # Don't count sync failure
 
     return $failed
 }

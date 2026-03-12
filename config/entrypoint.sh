@@ -191,6 +191,16 @@ fi
 
 chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 
+# Sync Codex config from remote repo if configured
+if [ -n "$CODEX_CONFIG_REPO" ]; then
+    echo "Syncing Codex config from $CODEX_CONFIG_REPO..."
+    if [ -d "/data/config/codex-config/.git" ]; then
+        su - agent -c "CODEX_CONFIG_REPO='$CODEX_CONFIG_REPO' codex-config-sync" || echo "Warning: Codex config sync failed"
+    else
+        su - agent -c "CODEX_CONFIG_REPO='$CODEX_CONFIG_REPO' codex-config-sync --init" || echo "Warning: Codex config init failed"
+    fi
+fi
+
 # Export secrets to agent's environment (from Fly secrets)
 AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
 {
@@ -203,6 +213,7 @@ AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
     # OpenRouter as backup for non-Anthropic/OpenAI models
     [ -n "$OPENROUTER_API_KEY" ] && echo "export OPENROUTER_API_KEY=\"$OPENROUTER_API_KEY\""
     [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
+    [ -n "$CODEX_CONFIG_REPO" ] && echo "export CODEX_CONFIG_REPO=\"$CODEX_CONFIG_REPO\""
     # GH_TOKEN for GitHub CLI (headless auth without gh auth login)
     [ -n "$GH_TOKEN" ] && echo "export GH_TOKEN=\"$GH_TOKEN\""
     # Disable Claude Code self-updater (updates managed via update-clis cron)
