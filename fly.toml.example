@@ -10,6 +10,8 @@ primary_region = "{{REGION}}"
 
 [build]
   dockerfile = "Dockerfile"
+  [build.args]
+    CACHEBUST = "1"
 
 # No public HTTP services - access via Tailscale only
 # Uncomment below if you want public SSH access (not recommended)

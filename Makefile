@@ -1,4 +1,4 @@
-.PHONY: build deploy logs ssh status clean help setup bootstrap lint format test qa fly-init
+.PHONY: build deploy logs ssh status clean help setup bootstrap lint format test qa fly-init fly-auth
 
 APP_NAME ?= agent-box
 REGION ?= sjc
@@ -33,6 +33,7 @@ help:
 	@echo "  make ssh        SSH into the machine"
 	@echo "  make status     Check machine status"
 	@echo "  make console    Open Fly console"
+	@echo "  make fly-auth   Set up CLI OAuth on the VM"
 	@echo "  make clean      Remove local build artifacts"
 	@echo ""
 	@echo "Variables:"
@@ -208,6 +209,9 @@ status:
 
 console:
 	fly ssh console -a $(APP_NAME)
+
+fly-auth:
+	@./scripts/cli-auth.sh $(APP_NAME)
 
 # =============================================================================
 # Local Development

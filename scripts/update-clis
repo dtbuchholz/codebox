@@ -40,6 +40,7 @@ else
 fi
 
 # Update Codex CLI (npm)
+# Note: /usr/local/bin/codex is the OAuth wrapper; real binary at /usr/bin/codex
 if command -v codex &>/dev/null; then
     OLD_VER=$(codex --version 2>/dev/null | head -1)
     log "Updating Codex CLI (current: $OLD_VER)..."

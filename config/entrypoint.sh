@@ -155,18 +155,18 @@ if [ "${AUTO_UPDATE_CLAUDE:-1}" = "1" ] || ! su - agent -c "command -v claude" &
     su - agent -c "curl -fsSL https://claude.ai/install.sh | bash" 2>/dev/null || echo "Claude Code install/update skipped"
 fi
 
-# Install or update OpenAI Codex CLI
+# Update Codex CLI (build-time install provides baseline)
+# Note: npm installs to /usr/bin/codex; wrapper at /usr/local/bin/codex handles OAuth
 if [ "${AUTO_UPDATE_CODEX:-1}" = "1" ]; then
-    echo "Installing/updating Codex CLI..."
-    npm install -g @openai/codex 2>/dev/null || echo "Codex CLI install/update skipped"
-elif ! command -v codex &> /dev/null; then
-    echo "Installing Codex CLI..."
-    npm install -g @openai/codex || echo "Codex CLI install will complete on first run"
+    echo "Updating Codex CLI..."
+    npm install -g @openai/codex 2>/dev/null || echo "Codex CLI update skipped (using build-time version)"
 fi
 
 # Ensure Codex home directory persists on volume
 mkdir -p /data/.codex
 chown agent:agent /data/.codex
+# Symlink ~/.codex -> /data/.codex for credential persistence across redeploys
+ln -sfn /data/.codex "$AGENT_HOME/.codex" 2>/dev/null || true
 
 # Ensure Claude Code config directory exists
 mkdir -p "$AGENT_HOME/.claude"
@@ -194,9 +194,14 @@ chown -R agent:agent "$AGENT_HOME/.claude" 2>/dev/null || true
 # Export secrets to agent's environment (from Fly secrets)
 AGENT_ENV_FILE="$AGENT_HOME/.env.secrets"
 {
+    # Claude Code auth: prefer OAuth token (subscription) over API key
+    [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\""
     [ -n "$ANTHROPIC_API_KEY" ] && echo "export ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\""
     [ -n "$ANTHROPIC_BASE_URL" ] && echo "export ANTHROPIC_BASE_URL=\"$ANTHROPIC_BASE_URL\""
+    # OpenAI API key (Takopi TTS — NOT used by Codex, wrapper unsets it)
     [ -n "$OPENAI_API_KEY" ] && echo "export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
+    # OpenRouter as backup for non-Anthropic/OpenAI models
+    [ -n "$OPENROUTER_API_KEY" ] && echo "export OPENROUTER_API_KEY=\"$OPENROUTER_API_KEY\""
     [ -n "$CLAUDE_CONFIG_REPO" ] && echo "export CLAUDE_CONFIG_REPO=\"$CLAUDE_CONFIG_REPO\""
     # GH_TOKEN for GitHub CLI (headless auth without gh auth login)
     [ -n "$GH_TOKEN" ] && echo "export GH_TOKEN=\"$GH_TOKEN\""

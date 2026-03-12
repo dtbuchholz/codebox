@@ -48,6 +48,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g pnpm
 
+# Install Python 3 and uv (fast Python package manager)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local" sh
+
 # Install GitHub CLI (gh) for Claude to interact with GitHub
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
@@ -72,6 +80,18 @@ RUN YAZI_VERSION=$(curl -sL https://api.github.com/repos/sxyazi/yazi/releases/la
     && chmod +x /usr/local/bin/yazi /usr/local/bin/ya \
     && rm -rf /tmp/yazi /tmp/yazi.zip
 
+# Install CLI tools at build time (CACHEBUST forces fresh installs on deploy)
+# Runtime entrypoint also updates these; build-time install ensures fast boot.
+# Set via: fly deploy --build-arg CACHEBUST=$(date +%s)
+ARG CACHEBUST=1
+RUN npm install -g @anthropic-ai/claude-code@latest @openai/codex@latest
+
+# Codex wrapper: unset OPENAI_API_KEY so Codex uses OAuth (codex login --device-auth)
+# OPENAI_API_KEY stays available for other processes (Takopi TTS, etc.).
+RUN printf '#!/bin/bash\nunset OPENAI_API_KEY\nexec /usr/bin/codex "$@"\n' \
+        > /usr/local/bin/codex \
+    && chmod +x /usr/local/bin/codex
+
 # Create agent user (non-root for security)
 RUN useradd -m -s /bin/bash -G sudo agent \
     && echo "agent ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -91,7 +111,7 @@ COPY --from=webhook-builder /build/webhook-receiver /usr/local/bin/
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/takopi-* /usr/local/bin/healthcheck.sh /usr/local/bin/update-clis /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh /usr/local/bin/init-admin 2>/dev/null || true \
+RUN chmod +x /usr/local/bin/cc-* /usr/local/bin/takopi-* /usr/local/bin/healthcheck.sh /usr/local/bin/update-clis /usr/local/bin/webhook-receiver /usr/local/bin/vm-setup.sh /usr/local/bin/init-admin /usr/local/bin/cli-auth.sh 2>/dev/null || true \
     && ln -sf /usr/local/bin/vm-setup.sh /usr/local/bin/vm-setup
 
 # Copy config files

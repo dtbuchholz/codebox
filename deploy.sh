@@ -63,7 +63,10 @@ if [ -n "$MISSING_SECRETS" ]; then
     echo "  fly secrets set AUTHORIZED_KEYS='ssh-ed25519 AAAA...' -a $APP_NAME"
     echo ""
     echo "Optional secrets:"
-    echo "  fly secrets set ANTHROPIC_API_KEY='sk-...' -a $APP_NAME"
+    echo "  fly secrets set CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat-...' -a $APP_NAME  # OAuth (preferred)"
+    echo "  fly secrets set ANTHROPIC_API_KEY='sk-ant-...' -a $APP_NAME            # API key (fallback)"
+    echo "  fly secrets set OPENAI_API_KEY='sk-...' -a $APP_NAME                   # Takopi TTS"
+    echo "  fly secrets set OPENROUTER_API_KEY='sk-or-...' -a $APP_NAME            # OpenRouter backup"
     echo "  fly secrets set WEBHOOK_AUTH_TOKEN='your-secret' -a $APP_NAME"
     echo ""
     read -p "Continue anyway? (y/N) " -n 1 -r
@@ -76,7 +79,7 @@ fi
 # Deploy
 echo ""
 echo "Deploying..."
-fly deploy -a "$APP_NAME"
+fly deploy -a "$APP_NAME" --build-arg "CACHEBUST=$(date +%s)"
 
 echo ""
 echo "=== Deployment Complete ==="

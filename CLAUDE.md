@@ -41,13 +41,15 @@ When modifying VM setup or documentation, be aware of these key configurations:
 
 ### Fly.io Secrets
 
-| Variable             | Description                     |
-| -------------------- | ------------------------------- |
-| `TAILSCALE_AUTHKEY`  | Tailscale auth key (required)   |
-| `AUTHORIZED_KEYS`    | SSH public keys (required)      |
-| `ANTHROPIC_API_KEY`  | Claude API key                  |
-| `OPENAI_API_KEY`     | For Takopi voice transcription  |
-| `CLAUDE_CONFIG_REPO` | Git repo for Claude config sync |
+| Variable                  | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `TAILSCALE_AUTHKEY`       | Tailscale auth key (required)                     |
+| `AUTHORIZED_KEYS`         | SSH public keys (required)                        |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token (preferred)               |
+| `ANTHROPIC_API_KEY`       | Claude API key (fallback if no OAuth token)       |
+| `OPENAI_API_KEY`          | Takopi TTS (not used by Codex, wrapper unsets it) |
+| `OPENROUTER_API_KEY`      | OpenRouter backup for non-Anthropic models        |
+| `CLAUDE_CONFIG_REPO`      | Git repo for Claude config sync                   |
 
 ### SSH Commit Signing
 

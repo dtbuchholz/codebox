@@ -121,11 +121,13 @@ else
     NEED_TAKOPI=true
 fi
 
-# Claude Code
-if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.env.secrets ]; then
-    print_success "Claude API key configured"
+# Claude Code auth
+if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    print_success "Claude Code: OAuth token (subscription)"
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    print_success "Claude Code: API key"
 else
-    print_warning "Claude API key not set"
+    print_warning "Claude Code: no auth configured"
 fi
 
 echo ""
@@ -261,6 +263,48 @@ else
 fi
 
 # ============================================================================
+# CLI Authentication (Claude Code + Codex)
+# ============================================================================
+print_header "CLI Authentication"
+
+# Claude Code OAuth
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    echo "Claude Code can use OAuth (subscription) instead of API keys."
+    echo ""
+    if ask_yes_no "Set up Claude Code OAuth token?" "n"; then
+        echo ""
+        echo "Running 'claude setup-token'..."
+        echo "This will print a URL. Open it in browser and copy the token."
+        echo ""
+        claude setup-token || print_warning "claude setup-token failed"
+        echo ""
+        echo -e "${YELLOW}IMPORTANT:${NC} Set the token as a Fly secret from your local machine:"
+        echo "  fly secrets set CLAUDE_CODE_OAUTH_TOKEN=\"sk-ant-oat-...\" -a <app-name>"
+        echo ""
+        echo "Press Enter to continue..."
+        read -r
+    fi
+else
+    print_success "Claude Code: OAuth token configured"
+fi
+
+# Codex OAuth
+if command -v codex &>/dev/null; then
+    CODEX_AUTH_FILE="${CODEX_HOME:-/data/.codex}/auth.json"
+    if [ -f "$CODEX_AUTH_FILE" ]; then
+        print_success "Codex: OAuth credentials found"
+    else
+        echo ""
+        echo "Codex can use OAuth (device code flow) for subscription auth."
+        echo ""
+        if ask_yes_no "Set up Codex OAuth now?" "n"; then
+            echo ""
+            /usr/bin/codex login --device-auth || print_warning "codex login failed"
+        fi
+    fi
+fi
+
+# ============================================================================
 # Takopi (Telegram)
 # ============================================================================
 if [ "$NEED_TAKOPI" = true ]; then
@@ -364,10 +408,12 @@ else
     print_warning "Takopi: not configured (optional) - run: takopi"
 fi
 
-if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.env.secrets ]; then
-    print_success "Claude API: configured"
+if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    print_success "Claude Code: OAuth (subscription)"
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    print_success "Claude Code: API key"
 else
-    print_warning "Claude API: set via 'fly secrets set ANTHROPIC_API_KEY=...' from local machine"
+    print_warning "Claude Code: no auth — set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY as Fly secret"
 fi
 
 echo ""
